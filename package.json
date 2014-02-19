@@ -1,0 +1,28 @@
+{
+  "name": "titanium-request",
+  "version": "0.0.0",
+  "description": "Titanium HTTP request library inspired by node and python equivalents",
+  "main": "index.js",
+  "scripts": {
+    "test": "make tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/dawicorti/titanium-request"
+  },
+  "keywords": [
+    "titanium",
+    "http",
+    "request"
+  ],
+  "author": "David Corticchiato",
+  "license": "BSD",
+  "bugs": {
+    "url": "https://github.com/dawicorti/titanium-request/issues"
+  },
+  "devDependencies": {
+    "mockti": "~1.1.1",
+    "mocha": "~1.17.1",
+    "tetanize": "0.0.6"
+  }
+}
