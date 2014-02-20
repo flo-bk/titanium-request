@@ -2,7 +2,7 @@
 
 ## Installation
 
-Get the latest [dist/request.js](https://raw.github.com/dawicorti/titanium-request/master/dist/request.js) into your __Resources__ folder or your __app/lib__ folder, if you're using __Alloy__.
+Get the latest [dist/request.js](https://raw.github.com/IsCoolEntertainment/titanium-request/master/dist/request.js) into your __Resources__ folder or your __app/lib__ folder, if you're using __Alloy__.
 
 ## API
 
