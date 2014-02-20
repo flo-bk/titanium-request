@@ -44,14 +44,4 @@ describe('client', function () {
 
   });
 
-  describe('request()', function () {
-    it ('', function () {
-      var cli = client();
-      cli.request({url: 'http://www.google.com', callback: function (err) {
-        assert.equal(null, err);
-      }});
-    });
-
-  });
-
 });
