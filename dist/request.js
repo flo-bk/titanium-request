@@ -128,7 +128,7 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
   
     ticlient.onerror = this.errorcb(ticlient);
     ticlient.onload = this.successcb(ticlient) 
-    ticlient.open(options.url, true);
+    ticlient.open(options.method, options.url, true);
     ticlient.send(options.data);
   };
   
