@@ -126,6 +126,7 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
   client.request = function (options) {
     var ticlient = Client.ticlient(options);
   
+    this.opt = options;
     ticlient.onerror = this.errorcb(ticlient);
     ticlient.onload = this.successcb(ticlient) 
     ticlient.open(options.method, options.url, true);
@@ -135,8 +136,10 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
   /* Error callback wrapper */
   
   client.errorcb = function (ticlient) {
+    var that = this;
+  
     return function (error) {
-      options.callback(error, null);
+      that.opt.callback(error, null);
     };
   };
   
@@ -146,7 +149,7 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
     var that = this;
   
     return function () {
-      options.callback(null, that.response(ticlient));
+      that.opt.callback(null, that.response(ticlient));
     };
   };
   
@@ -162,7 +165,37 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
     }
     
     return jobject;  
-  }
+  };
+  
+  /* Returns response headers as JSON object */
+  
+  client.headers = function (ticlient) {
+    var headers = {};
+  
+    if (!!ticlient.getResponseHeaders) {
+      return ticlient.getResponseHeaders() || {};
+    }
+  
+    if (!ticlient.getAllResponseHeaders) return {};
+  
+    ticlient.getAllResponseHeaders().split('\n').forEach(function (line) {
+      var matchLine, matchName, matchValue;
+      
+      matchLine = line.match(/([^\:]*)\:(.*)/);
+      if (!matchLine) return;
+  
+      matchName = matchLine[1].match(/\s*([^\s]{1}.*[^\s]{1})\s*/);
+      if (!matchName) return;
+  
+      matchValue = matchLine[2].match(/\s*([^\s]{1}.*[^\s]{1})\s*/);
+      if (!matchValue) return;
+  
+      headers[matchName[1]] = matchValue[1];
+    });
+  
+    return headers;
+  };
+  
   
   /* Response object factory */
   
@@ -173,7 +206,8 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
       xml: ticlient.responseXML,
       blob: ticlient.responseData,
       text: ticlient.responseText,
-      json: this.jobject(ticlient)
+      json: this.jobject(ticlient),
+      headers: this.headers(ticlient)
     }
   };
 

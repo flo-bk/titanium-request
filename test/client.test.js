@@ -42,11 +42,11 @@ describe('client', function () {
       assert.equal(200, response.code);
     });
 
-    it('should return headers', function () {
+    it('should return headers as json object', function () {
       var cli = client();
       var response = cli.response(jsonFixture);
 
-      assert.equal('foobar=42', response.headers['set-cookie']);
+      assert.equal('gws', response.headers['Server']);
     });
 
   });

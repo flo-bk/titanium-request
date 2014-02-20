@@ -33,10 +33,10 @@ The JSON object is given as second parameter of a callback, is no error occurred
 * __res.blob__ : Response as [Titanium.Blob](http://docs.appcelerator.com/titanium/latest/#!/api/Titanium.Blob) format
 * __res.xml__  : Response as [Titanium.XML.Document](http://docs.appcelerator.com/titanium/latest/#!/api/Titanium.XML.Document) format (null if text is not XML compliant)
 * __res.json__ : Response as __JSON__ object (null if text is not JSON compliant)
+* __res.headers__ : Response headers as __JSON__ object
 
 ## Wish list
 
-* __res.headers__ object
 * __options.headers__ object
 * Cookies cache
 * Requests Pool
