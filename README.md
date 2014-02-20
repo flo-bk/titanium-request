@@ -20,7 +20,7 @@ __request.delete__(url, [options])
 var request = require('request');
 
 request.get('http://www.example.com', function (err, res) {
-  if (!err && !!res.json) console.log('Got value :', res.json.value);
+  if (!err && !!res.json) console.log('Got JSON response :', res.json);
 });
 ```
 
