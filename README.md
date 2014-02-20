@@ -17,8 +17,6 @@ __request.delete__(url, [options])
 ## Example
 
 ```js
-var request = require('request');
-
 request.get('http://www.example.com', function (err, res) {
   if (!err && !!res.json) console.log('Got JSON response :', res.json);
 });
@@ -35,9 +33,22 @@ The JSON object is given as second parameter of a callback, is no error occurred
 * __res.json__ : Response as __JSON__ object (null if text is not JSON compliant)
 * __res.headers__ : Response headers as __JSON__ object
 
+## Request Headers
+
+Request headers are passed through the options object
+
+```js
+var headers = {
+  'cookie': 'session=E8vh78'
+};
+
+request.post('http://www.example.com/article', function (err, res) {
+  if (!err && !!res.json) console.log('Got JSON response :', res.json);
+}, {headers: headers});
+```
+
 ## Wish list
 
-* __options.headers__ object
 * Cookies cache
 * Requests Pool
 * Retries

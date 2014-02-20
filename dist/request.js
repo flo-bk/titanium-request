@@ -105,12 +105,14 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
   
   var Client = module.exports = function () {
     if (!(this instanceof Client)) return new Client;
+  
+    this.ticlient = Client._ticlient();
   };
   
   /* Simple Titanium HTTPClient constructor */
   
-  Client.ticlient = function (options) {
-    return Ti.Network.createHTTPClient(options);
+  Client._ticlient = function () {
+    return Ti.Network.createHTTPClient();
   };
   
   
@@ -124,18 +126,27 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
   /* HTTP request factory */
   
   client.request = function (options) {
-    var ticlient = Client.ticlient(options);
-  
     this.opt = options;
+    this.setheaders(ticlient);
     ticlient.onerror = this.errorcb(ticlient);
     ticlient.onload = this.successcb(ticlient) 
     ticlient.open(options.method, options.url, true);
     ticlient.send(options.data);
   };
   
+  /* Set headers from options.headers object */
+  
+  client.setheaders = function () {
+    var that = this;
+  
+    Object.keys(this.opt.headers || {}).forEach(function (name) {
+      that.ticlient.setRequestHeader(name, that.opt.headers[name]);
+    });
+  };
+  
   /* Error callback wrapper */
   
-  client.errorcb = function (ticlient) {
+  client.errorcb = function () {
     var that = this;
   
     return function (error) {
@@ -145,21 +156,21 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
   
   /* Success callback wrapper */
   
-  client.successcb = function (ticlient) {
+  client.successcb = function () {
     var that = this;
   
     return function () {
-      that.opt.callback(null, that.response(ticlient));
+      that.opt.callback(null, that.response(that.ticlient));
     };
   };
   
   /* Try to parse text response, returns null */
   
-  client.jobject = function (ticlient) {
+  client.jobject = function () {
     var jobject = null;
   
     try {
-      jobject = JSON.parse(ticlient.responseText);
+      jobject = JSON.parse(this.ticlient.responseText);
     } catch (err) {
       if (this.debug) console.log(err);  
     }
@@ -167,18 +178,12 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
     return jobject;  
   };
   
-  /* Returns response headers as JSON object */
+  /* Split a raw paragraph to build a corresponding object */
   
-  client.headers = function (ticlient) {
-    var headers = {};
+  client.splitobj = function (raw) {
+    var obj = {};
   
-    if (!!ticlient.getResponseHeaders) {
-      return ticlient.getResponseHeaders() || {};
-    }
-  
-    if (!ticlient.getAllResponseHeaders) return {};
-  
-    ticlient.getAllResponseHeaders().split('\n').forEach(function (line) {
+    raw.split('\n').forEach(function (line) {
       var matchLine, matchName, matchValue;
       
       matchLine = line.match(/([^\:]*)\:(.*)/);
@@ -190,24 +195,42 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
       matchValue = matchLine[2].match(/\s*([^\s]{1}.*[^\s]{1})\s*/);
       if (!matchValue) return;
   
-      headers[matchName[1]] = matchValue[1];
+      obj[matchName[1]] = matchValue[1];
     });
   
-    return headers;
+    return obj;
+  };
+  
+  /* Returns response headers as JSON object */
+  
+  client.headers = function () {
+    var headers = {};
+    var raw = null;
+  
+    if (!!this.ticlient.getResponseHeaders) {
+      return this.ticlient.getResponseHeaders() || {};
+    }
+  
+    if (!this.ticlient.getAllResponseHeaders) return {};
+  
+    raw = this.ticlient.getAllResponseHeaders();
+    if(!raw) return {};
+  
+    return this.splitobj(raw);
   };
   
   
   /* Response object factory */
   
-  client.response = function (ticlient) {
+  client.response = function () {
   
     return {
-      code: ticlient.status,
-      xml: ticlient.responseXML,
-      blob: ticlient.responseData,
-      text: ticlient.responseText,
-      json: this.jobject(ticlient),
-      headers: this.headers(ticlient)
+      code: this.ticlient.status,
+      xml: this.ticlient.responseXML,
+      blob: this.ticlient.responseData,
+      text: this.ticlient.responseText,
+      json: this.jobject(),
+      headers: this.headers()
     }
   };
 
