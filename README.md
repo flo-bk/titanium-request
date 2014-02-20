@@ -22,5 +22,14 @@ var request = require('request');
 request.get('http://www.example.com', function (err, res) {
   if (!err && !!res.json) console.log('Got value :', res.json.value);
 });
-
 ```
+
+## JSON Response Object
+
+The JSON object is given as second parameter of a callback, is no error occurred in the request.
+
+* __res.code__ : HTTP Status code
+* __res.text__ : Response as __String__ format
+* __res.blob__ : Response as [Titanium.Blob](http://docs.appcelerator.com/titanium/latest/#!/api/Titanium.Blob) format
+* __res.xml__  : Response as [Titanium.XML.Document](http://docs.appcelerator.com/titanium/latest/#!/api/Titanium.XML.Document) format (null if text is not XML compliant)
+* __res.json__ : Response as __JSON__ object (null if text is not JSON compliant)
