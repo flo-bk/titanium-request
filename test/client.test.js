@@ -5,9 +5,9 @@ var client = require('../lib/client');
 var jsonFixture = require('./fixtures/responsejson');
 var textFixture = require('./fixtures/responsetext');
 
-client.ticlient = function (options) {
+client._ticlient = function () {
   var Ti = mockti();
-  return Ti.Network.createHTTPClient(options);
+  return Ti.Network.createHTTPClient();
 };
 
 
@@ -17,7 +17,8 @@ describe('client', function () {
     
     it('should retrieve json data from text', function () {
       var cli = client();
-      var jobject = cli.jobject(jsonFixture);
+      cli.ticlient = jsonFixture;
+      var jobject = cli.jobject();
 
       assert.equal(42, jobject.data[1]);
     });
@@ -35,7 +36,8 @@ describe('client', function () {
 
     it('should retrieve text json and code', function () {
       var cli = client();
-      var response = cli.response(jsonFixture);
+      cli.ticlient = jsonFixture;
+      var response = cli.response();
 
       assert.equal(jsonFixture.responseText, response.text);
       assert.equal(42, response.json.data[1]);
@@ -44,7 +46,8 @@ describe('client', function () {
 
     it('should return headers as json object', function () {
       var cli = client();
-      var response = cli.response(jsonFixture);
+      cli.ticlient = jsonFixture;
+      var response = cli.response();
 
       assert.equal('gws', response.headers['Server']);
     });
