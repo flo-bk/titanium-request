@@ -12,6 +12,7 @@ module.exports = {
         'X-XSS-Protection:1; mode=block     \n' +
         'X-Frame-Options:SAMEORIGIN  \n' +
         '   Alternate-Protocol:80:quic\n' +
-        '  Transfer-Encoding:chunked   \n'
+        '  Transfer-Encoding:chunked   \n' +
+        'set-cookie: session=AFLKaio5;Path=/';
   }
 };
