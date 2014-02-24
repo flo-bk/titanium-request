@@ -54,4 +54,16 @@ describe('client', function () {
 
   });
 
+  describe('setheaders()', function () {
+
+    it('should copy headers values', function () {
+      var cli = client();
+      cli.opt = {headers: {'Server': 'gws'}}
+      cli.setheaders();
+
+      assert.equal('gws', cli.ticlient.headers['Server']);
+    });
+  
+  });
+
 });
