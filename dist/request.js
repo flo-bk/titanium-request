@@ -28,6 +28,7 @@ __tetanize_define('index.js', function (require, exports, module) {
    */
   
   var client = require('lib/client.js');
+  var settings = require('lib/settings.js');
   
   /* Void callback */
   
@@ -95,9 +96,27 @@ __tetanize_define('index.js', function (require, exports, module) {
     client().request(options);
   };
   
+  /*
+   * @api
+   * Change one settings variable
+   */
+  
+  exports.set = function (name, value) {
+    settings[name] = value;
+  };
+  
+
+});
+__tetanize_define('lib/settings.js', function (require, exports, module) { 
+  var settings = module.exports = {};
+  
+  settings.dbname = 'titanium_request';
+  settings.loglevel = 1;
+  settings.cookies = false;
 
 });
 __tetanize_define('lib/client.js', function (require, exports, module) { 
+  var cookie = require('lib/cookie.js');
   
   /*
    * Exports Client constructor
@@ -117,7 +136,7 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
   
   
   /*
-   * Local Dependencies
+   * Local Referencies
    */
   
   var client = Client.prototype;
@@ -127,11 +146,15 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
   
   client.request = function (options) {
     this.opt = options;
-    this.setheaders(ticlient);
-    ticlient.onerror = this.errorcb(ticlient);
-    ticlient.onload = this.successcb(ticlient) 
-    ticlient.open(options.method, options.url, true);
-    ticlient.send(options.data);
+    options.headers = options.headers || {};
+  
+    cookie.extend(options.url, options.headers);
+    this.setheaders();
+  
+    this.ticlient.onerror = this.errorcb();
+    this.ticlient.onload = this.successcb() 
+    this.ticlient.open(options.method, options.url, true);
+    this.ticlient.send(options.data);
   };
   
   /* Set headers from options.headers object */
@@ -160,7 +183,10 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
     var that = this;
   
     return function () {
-      that.opt.callback(null, that.response(that.ticlient));
+      var res = that.response(that.ticlient);
+  
+      cookie.save(that.opt.url, res.headers);
+      that.opt.callback(null, res);
     };
   };
   
@@ -233,6 +259,268 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
       headers: this.headers()
     }
   };
+
+});
+__tetanize_define('lib/cookie.js', function (require, exports, module) { 
+  /*
+   * Dependencies
+   */
+  
+  var db = require('lib/db.js');
+  var settings = require('lib/settings.js');
+  
+  /*
+   * Local Referencies
+   */
+  
+  var cookie = module.exports = {};
+  
+  
+  /* Save cookies from 'set-cookie' line */
+  
+  cookie.save = function (url, headers) {
+    if (!settings.cookies) return false;
+  
+    var line = headers['set-cookie'] || headers['Set-Cookie'] || null;
+    if (!line) return false;
+  
+    var domain = cookie.domain(url);
+    var obj = cookie.parse(line);
+    
+    Object.keys(obj).forEach(function (name) {
+      var value = obj[name];
+  
+      if (!cookie.update(domain, name, value)) {
+        cookie.set(domain, name, value);
+      }
+    });
+  
+    return true;
+  };
+  
+  /* Extend the actual cookie line */
+  
+  cookie.extend = function (url, headers) {
+    if (!settings.cookies) return false;
+  
+    var paramName = !!headers['Cookie'] ? 'Cookie' : 'cookie';
+    var domain = cookie.domain(url);
+    var obj = cookie.getall(domain)
+  
+    if (!!headers[paramName]) {
+      var patch = cookie.parse(headers[paramName]);
+  
+      Object.keys(patch).forEach(function (key) {
+        obj[key] = patch[key];
+      });
+    }
+  
+    headers[paramName] = cookie.serialize(obj);
+    return true;
+  };
+  
+  /* Insert a new row in Cookies Table */
+  
+  cookie.set = function (domain, name, value) {
+    db.q(db.format('INSERT OR REPLACE INTO cookie ({keys}) VALUES ({values})', {
+      domain: domain,
+      name: name,
+      value: value
+    }));
+  };
+  
+  /* Select a row in Cookies Table */
+  
+  cookie.get = function (domain, name) {
+    var obj = null;
+    var query = db.format('SELECT * FROM cookie WHERE domain={domain} AND name={name}', {
+      domain: domain,
+      name: name
+    });
+  
+    db.q(query, function (res) {
+      result = res.fieldByName('value');
+    });
+  
+    return result;
+  };
+  
+  /* Select all cookies rows in Cookies Table for a specific domain */
+  
+  cookie.getall = function (domain) {
+    var obj =  {};
+    var query = db.format('SELECT * FROM cookie WHERE domain={domain}', {
+      domain: domain
+    });
+  
+    db.each(query, function (res) {
+      obj[res.fieldByName('name')] = res.fieldByName('value');
+    });
+  
+    return obj;
+  };
+  
+  /* Parse a 'set-cookie' line */
+  
+  cookie.parse = function (line) {
+    var obj = {}
+    var pairs = line.split(/; */);
+  
+    pairs.forEach(function(pair) {
+      cookie.append(pair, obj);
+    });
+  
+    return obj;
+  };
+  
+  /* Serialize a cookie object into a cookie line */
+  
+  cookie.serialize = function (obj) {
+    return Object.keys(obj).map(function (key) {
+      return key + '=' + encodeURIComponent(obj[key]);
+    }).join(';');
+  };
+  
+  /* Decode and add a cookie pair */
+  
+  cookie.append = function (pair, obj) {
+    var eqId = pair.indexOf('=')
+    if (eqId < 0) return;
+  
+    var key = pair.substr(0, eqId).trim()
+    var val = pair.substr(++eqId, pair.length).trim();
+  
+    // quoted values
+    if ('"' == val[0]) {
+        val = val.slice(1, -1);
+    }
+  
+    obj[key] = decodeURIComponent(val);
+  };
+  
+  /* Retrieve domain from url */
+  
+  cookie.domain = function (url) {
+    return url.match(/https?:\/\/([A-Za-z\-0-9]+\.)*([A-Za-z\-0-9]+\.[A-Za-z\-0-9]+)\/?.*/)[2];
+  };
+
+});
+__tetanize_define('lib/db.js', function (require, exports, module) { 
+  /*
+   * Dependencies
+   */
+  
+  var logger = require('lib/logger.js');
+  var settings = require('lib/settings.js');
+  
+  /*
+   * Local Referencies
+   */
+  
+  var conn = null;
+  var db = module.exports = {};
+  
+  
+  /* Exports Titanium wrapper to DB.open */
+  
+  db._open = function (dbname) {
+    return Ti.Database.open(dbname)
+  };
+  
+  /* Init database and table */
+  
+  db.init = function () {
+    var status = true;
+  
+    if (conn !== null)  return true;
+  
+    try {
+      conn = db._open(settings.dbname);
+    } catch (err) {
+      status = false;
+      logger.err('Failed to open database : "' + settings.dbname + '"');
+    }
+  
+    return status;
+  };
+  
+  /* Execute a query */
+  
+  db.q = function (query, callback) {
+    if (! (db.init())) return false;
+    var res = conn.execute(query);
+  
+    if (!!callback && res.isValidRow()) callback(res);
+    res.close();
+    return true;
+  };
+  
+  /* Execute a query for several lines */
+  
+  db.each = function (query, callback) {
+    db.q(query, function (res) {
+      while (res.isValidRow())
+      {
+        callback(res);
+        res.next();
+      }
+    });
+  };
+  
+  /* Format query with given values */
+  
+  db.format = function (query, values) {
+    var res = query
+      .replace('{keys}', Object.keys(values).join(','))
+      .replace('{values}', Object.keys(values).map(function (key) {
+        return '\'' + values[key] + '\'';
+      }).join(','));
+  
+    Object.keys(values).forEach(function (key) {
+      res = res.replace('{' + key + '}', '\'' + values[key] + '\'');
+    });
+  
+    return res;
+  };
+
+});
+__tetanize_define('lib/logger.js', function (require, exports, module) { 
+  /*
+   * Dependencies
+   */
+  
+  var settings = require('lib/settings.js');
+  
+  /*
+   * Local Referencies
+   */
+  
+  var logger = module.exports = {};
+  var levels = ['error', 'warning', 'debug', 'info'];
+  
+  
+  /* Main log function */
+  
+  logger.log = function (lvl, msg) {
+    if (settings.loglevel >= lvl) console.log(msg);
+  };
+  
+  /* Generate accessors */
+  
+  levels.forEach(function (lvlname) {
+    logger[lvlname] = function (msg) {
+      var lvl = levels.indexOf(lvlname);
+  
+      logger.log(lvl, msg);
+    };
+  });
+  
+  /* Aliases */
+  
+  logger.err = logger.error;
+  logger.warn = logger.warning;
+  logger.d = logger.debug;
+  
 
 });
 

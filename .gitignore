@@ -1,1 +1,4 @@
 node_modules
+build
+test/integration/Resources/request.js
+

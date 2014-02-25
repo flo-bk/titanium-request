@@ -4,7 +4,7 @@
   "description": "Titanium HTTP request library inspired by node and python equivalents",
   "main": "index.js",
   "scripts": {
-    "test": "make tests"
+    "test": "make test"
   },
   "repository": {
     "type": "git",
