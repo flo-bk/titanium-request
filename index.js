@@ -3,6 +3,7 @@
  */
 
 var client = require('./lib/client');
+var settings = require('./lib/settings');
 
 /* Void callback */
 
@@ -68,4 +69,13 @@ exports.delete = function (url, callback, options) {
   options.method = 'PUT';
 
   client().request(options);
+};
+
+/*
+ * @api
+ * Change one settings variable
+ */
+
+exports.set = function (name, value) {
+  settings[name] = value;
 };

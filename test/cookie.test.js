@@ -16,6 +16,14 @@ describe('cookie', function () {
 
   });
 
+  describe('serialize()', function () {
+    
+    it('should retrieve a cookie string from an object', function () {
+      assert.equal('foobar=42;Path=%2F', cookie.serialize({foobar: 42, Path: '/'}));
+    });
+
+  });
+
   describe('domain()', function () {
     
     it('should works with simple uri', function () {

@@ -5,7 +5,7 @@ var db = require('../lib/db');
 var jsonFixture = require('./fixtures/responsejson');
 var textFixture = require('./fixtures/responsetext');
 
-describe('cookie', function () {
+describe('db', function () {
 
   describe('format()', function () {
     
@@ -27,6 +27,14 @@ describe('cookie', function () {
 
     it('should chain values in line', function () {
       assert.equal('\'42\',\'world\',\'good\'', db.format('{values}', {
+        foobar: 42,
+        hello: 'world',
+        something: 'good'
+      }));
+    });
+
+    it('should replace each value', function () {
+      assert.equal('\'42\'', db.format('{foobar}', {
         foobar: 42,
         hello: 'world',
         something: 'good'
