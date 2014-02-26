@@ -26,27 +26,27 @@ describe('cookie', function () {
 
   describe('domain()', function () {
     
-    it('should works with simple uri', function () {
+    it('should work with simple uri', function () {
       assert.equal('example.com', cookie.domain('http://example.com'));
     });
 
-    it('should works with subdomain', function () {
+    it('should work with subdomain', function () {
       assert.equal('example.com', cookie.domain('http://www.example.com'));
     });
 
-    it('should works with subdomain comparison', function () {
+    it('should work with subdomain comparison', function () {
       assert.equal(cookie.domain('http://api.example.com'), cookie.domain('http://www.example.com'));
     });
 
-    it('should works with path', function () {
+    it('should work with path', function () {
       assert.equal('example.com', cookie.domain('http://api.example.com/v1/jobs'));
     });
 
-    it('should works with queries', function () {
+    it('should work with queries', function () {
       assert.equal('example.com', cookie.domain('http://api.example.com?foobar=42'));
     });
 
-    it('should works with https', function () {
+    it('should work with https', function () {
       assert.equal('example.com', cookie.domain('https://api.example.com?foobar=42'));
     });
 
