@@ -7,7 +7,7 @@ Get the latest [dist/request.js](https://raw.github.com/IsCoolEntertainment/tita
 ## API
 
 __request.get__(url, callback, [data], [options])
-_In __GET__ case, data is converted to quey string_
+_In GET case, data is converted to quey string_
 
 __request.post__(url, callback, [data], [options])
 
