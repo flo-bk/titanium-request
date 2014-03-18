@@ -6,13 +6,14 @@ Get the latest [dist/request.js](https://raw.github.com/IsCoolEntertainment/tita
 
 ## API
 
-__request.get__(url, callback, [options])
+__request.get__(url, callback, [data], [options])
+_In __GET__ case, data is converted to quey string_
 
-__request.post__(url, data, [options])
+__request.post__(url, callback, [data], [options])
 
-__request.put__(url, data, [options])
+__request.put__(url, callback, [data], [options])
 
-__request.delete__(url, [options])
+__request.delete__(url, callback, [data], [options])
 
 ## Example
 

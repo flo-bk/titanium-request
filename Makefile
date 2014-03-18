@@ -14,7 +14,8 @@ test-unit:
 
 test-integ: dist
 	@cp dist/request.js ./test/integration/app/Resources/request.js
-	@ti build --project-dir ./test/integration/app -p android
+	@ti build --project-dir ./test/integration/app -p android > ./test/integration/integration.test.log 2>&1 &
+	@./node_modules/.bin/mocha -t 120000 test/integration/suite/*
 
 test: test-unit test-integ
 

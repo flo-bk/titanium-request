@@ -22,29 +22,41 @@ var __tetanize_define = function (id, constructor) {
     __tetanize_constructors[id] = constructor;
 };
 
+__tetanize_define('lib/settings.js', function (require, exports, module) { 
+  var settings = module.exports = {};
+  
+  settings.dbname = 'titanium_request';
+  settings.loglevel = 1;
+  settings.cookies = false;
+
+});
 __tetanize_define('index.js', function (require, exports, module) { 
   /*
    * Dependencies 
    */
   
+  var queryString = require('node_modules/query-string/query-string.js');
   var client = require('lib/client.js');
   var settings = require('lib/settings.js');
   
   /* Void callback */
   
   var noop = function () {};
-  
+  var handlers = [];
   
   /*
    * @api
    * Proceed an HTTP request with GET method
    */
   
-  exports.get = function (url, callback, options) {
+  exports.get = function (url, callback, data, options) {
+    var query = queryString.stringify(data);
+  
     options = options || {};
-    options.url = url;
-    options.callback = callback;
+    options.url = url + (!!query ? '?' + query : '');
+    options.callback = callback || noop;
     options.method = 'GET';
+    options.handlers = handlers;
   
     client().request(options);
   };
@@ -55,12 +67,13 @@ __tetanize_define('index.js', function (require, exports, module) {
    * Proceed an HTTP request with POST method
    */
   
-  exports.post = function (url, data, callback, options) {
+  exports.post = function (url, callback, data, options) {
     options = options || {};
     options.url = url;
-    options.callback = callback;
+    options.callback = callback || noop;
     options.data = data;
     options.method = 'POST';
+    options.handlers = handlers;
   
     client().request(options);
   };
@@ -71,12 +84,13 @@ __tetanize_define('index.js', function (require, exports, module) {
    * Proceed an HTTP request with PUT method
    */
   
-  exports.put = function (url, data, callback, options) {
+  exports.put = function (url, callback, data, options) {
     options = options || {};
     options.url = url;
-    options.callback = callback;
+    options.callback = callback || noop;
     options.data = data;
     options.method = 'PUT';
+    options.handlers = handlers;
   
     client().request(options);
   };
@@ -87,13 +101,24 @@ __tetanize_define('index.js', function (require, exports, module) {
    * Proceed an HTTP request with DELETE method
    */
   
-  exports.delete = function (url, callback, options) {
+  exports.delete = function (url, callback, data, options) {
     options = options || {};
     options.url = url;
-    options.callback = callback;
-    options.method = 'PUT';
+    options.callback = callback || noop;
+    options.data = data;
+    options.method = 'DELETE';
+    options.handlers = handlers;
   
     client().request(options);
+  };
+  
+  /*
+   * @api
+   * Adds middleware for requests and reponses
+   */
+  
+  exports.use = function (handler) {
+    handlers.push(handler);
   };
   
   /*
@@ -107,12 +132,72 @@ __tetanize_define('index.js', function (require, exports, module) {
   
 
 });
-__tetanize_define('lib/settings.js', function (require, exports, module) { 
-  var settings = module.exports = {};
+__tetanize_define('node_modules/query-string/query-string.js', function (require, exports, module) { 
+  /*!
+  	query-string
+  	Parse and stringify URL query strings
+  	https://github.com/sindresorhus/query-string
+  	by Sindre Sorhus
+  	MIT License
+  */
+  (function () {
+  	'use strict';
+  	var queryString = {};
   
-  settings.dbname = 'titanium_request';
-  settings.loglevel = 1;
-  settings.cookies = false;
+  	queryString.parse = function (str) {
+  		if (typeof str !== 'string') {
+  			return {};
+  		}
+  
+  		str = str.trim().replace(/^\?/, '');
+  
+  		if (!str) {
+  			return {};
+  		}
+  
+  		return str.trim().split('&').reduce(function (ret, param) {
+  			var parts = param.replace(/\+/g, ' ').split('=');
+  			var key = parts[0];
+  			var val = parts[1];
+  
+  			key = decodeURIComponent(key);
+  			// missing `=` should be `null`:
+  			// http://w3.org/TR/2012/WD-url-20120524/#collect-url-parameters
+  			val = val === undefined ? null : decodeURIComponent(val);
+  
+  			if (!ret.hasOwnProperty(key)) {
+  				ret[key] = val;
+  			} else if (Array.isArray(ret[key])) {
+  				ret[key].push(val);
+  			} else {
+  				ret[key] = [ret[key], val];
+  			}
+  
+  			return ret;
+  		}, {});
+  	};
+  
+  	queryString.stringify = function (obj) {
+  		return obj ? Object.keys(obj).map(function (key) {
+  			var val = obj[key];
+  
+  			if (Array.isArray(val)) {
+  				return val.map(function (val2) {
+  					return encodeURIComponent(key) + '=' + encodeURIComponent(val2);
+  				}).join('&');
+  			}
+  
+  			return encodeURIComponent(key) + '=' + encodeURIComponent(val);
+  		}).join('&') : '';
+  	};
+  
+  	if (typeof module !== 'undefined' && module.exports) {
+  		module.exports = queryString;
+  	} else {
+  		window.queryString = queryString;
+  	}
+  })();
+  
 
 });
 __tetanize_define('lib/client.js', function (require, exports, module) { 
@@ -145,15 +230,20 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
   /* HTTP request factory */
   
   client.request = function (options) {
+    var that = this;
+  
     this.opt = options;
     options.headers = options.headers || {};
   
     cookie.extend(options.url, options.headers);
-    this.setheaders();
+    this.opt.handlers.forEach(function (handler) {
+      handler(that.opt, null);
+    });
   
     this.ticlient.onerror = this.errorcb();
     this.ticlient.onload = this.successcb() 
     this.ticlient.open(options.method, options.url, true);
+    this.setheaders();
     this.ticlient.send(options.data);
   };
   
@@ -190,19 +280,34 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
     };
   };
   
-  /* Try to parse text response, returns null */
+  /* Try to parse text response with JSON, returns null on error */
   
-  client.jobject = function () {
-    var jobject = null;
+  client.jsonObject = function () {
+    var jsonObject = null;
   
     try {
-      jobject = JSON.parse(this.ticlient.responseText);
+      jsonObject = JSON.parse(this.ticlient.responseText);
     } catch (err) {
       if (this.debug) console.log(err);  
     }
     
-    return jobject;  
+    return jsonObject;
   };
+  
+  /* Try to parse text response with XML, returns null on error */
+  
+  client.xmlObject = function () {
+    var xmlObject = null;
+  
+    try {
+      xmlObject = this.ticlient.responseXML;
+    } catch (err) {
+      if (this.debug) console.log(err);  
+    }
+    
+    return xmlObject;  
+  };
+  
   
   /* Split a raw paragraph to build a corresponding object */
   
@@ -249,15 +354,21 @@ __tetanize_define('lib/client.js', function (require, exports, module) {
   /* Response object factory */
   
   client.response = function () {
-  
-    return {
+    var that = this;
+    var res = {
       code: this.ticlient.status,
-      xml: this.ticlient.responseXML,
+      xml: this.xmlObject(),
       blob: this.ticlient.responseData,
       text: this.ticlient.responseText,
-      json: this.jobject(),
+      json: this.jsonObject(),
       headers: this.headers()
-    }
+    };
+  
+    this.opt.handlers.forEach(function (handler) {
+      handler(that.opt, res);
+    });
+  
+    return res;
   };
 
 });

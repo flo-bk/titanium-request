@@ -1,4 +1,5 @@
 node_modules
 build
-test/integration/Resources/request.js
+test/integration/app/Resources/request.js
+*.log
 
