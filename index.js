@@ -2,7 +2,6 @@
  * Dependencies 
  */
 
-var queryString = require('query-string');
 var client = require('./lib/client');
 var settings = require('./lib/settings');
 
@@ -10,22 +9,26 @@ var settings = require('./lib/settings');
 
 var noop = function () {};
 var handlers = [];
+var request = module.exports = {};
+
+
+request.setup = function (url, callback, options, method) {
+  options = options || {};
+  options.url = url;
+  options.callback = callback || noop;
+  options.method = method;
+  options.handlers = handlers;
+
+  return options;
+};
 
 /*
  * @api
  * Proceed an HTTP request with GET method
  */
 
-exports.get = function (url, callback, data, options) {
-  var query = queryString.stringify(data);
-
-  options = options || {};
-  options.url = url + (!!query ? '?' + query : '');
-  options.callback = callback || noop;
-  options.method = 'GET';
-  options.handlers = handlers;
-
-  client().request(options);
+request.get = function (url, callback, options) {
+  client().request(request.setup(url, callback, options, 'GET'));
 };
 
 
@@ -34,15 +37,8 @@ exports.get = function (url, callback, data, options) {
  * Proceed an HTTP request with POST method
  */
 
-exports.post = function (url, callback, data, options) {
-  options = options || {};
-  options.url = url;
-  options.callback = callback || noop;
-  options.data = data;
-  options.method = 'POST';
-  options.handlers = handlers;
-
-  client().request(options);
+request.post = function (url, callback, options) {
+  client().request(request.setup(url, callback, options, 'POST'));
 };
 
 
@@ -51,15 +47,8 @@ exports.post = function (url, callback, data, options) {
  * Proceed an HTTP request with PUT method
  */
 
-exports.put = function (url, callback, data, options) {
-  options = options || {};
-  options.url = url;
-  options.callback = callback || noop;
-  options.data = data;
-  options.method = 'PUT';
-  options.handlers = handlers;
-
-  client().request(options);
+request.put = function (url, callback, options) {
+  client().request(request.setup(url, callback, options, 'PUT'));
 };
 
 
@@ -68,15 +57,8 @@ exports.put = function (url, callback, data, options) {
  * Proceed an HTTP request with DELETE method
  */
 
-exports.delete = function (url, callback, data, options) {
-  options = options || {};
-  options.url = url;
-  options.callback = callback || noop;
-  options.data = data;
-  options.method = 'DELETE';
-  options.handlers = handlers;
-
-  client().request(options);
+request.delete = function (url, callback, options) {
+  client().request(request.setup(url, callback, options, 'DELETE'));
 };
 
 /*
@@ -84,7 +66,7 @@ exports.delete = function (url, callback, data, options) {
  * Adds middleware for requests and reponses
  */
 
-exports.use = function (handler) {
+request.use = function (handler) {
   handlers.push(handler);
 };
 
@@ -93,6 +75,6 @@ exports.use = function (handler) {
  * Change one settings variable
  */
 
-exports.set = function (name, value) {
+request.set = function (name, value) {
   settings[name] = value;
 };

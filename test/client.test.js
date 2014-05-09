@@ -5,7 +5,7 @@ var client = require('../lib/client');
 var jsonFixture = require('./fixtures/responsejson');
 var textFixture = require('./fixtures/responsetext');
 
-client._ticlient = function () {
+client.prototype._ticlient = function () {
   var Ti = mockti();
   return Ti.Network.createHTTPClient();
 };
@@ -18,14 +18,14 @@ describe('client', function () {
     it('should retrieve json data from text', function () {
       var cli = client();
       cli.ticlient = jsonFixture;
-      var jobject = cli.jobject();
+      var jobject = cli.jsonObject(textFixture);
 
       assert.equal(42, jobject.data[1]);
     });
 
     it('should return null if no JSON data is found', function () {
       var cli = client();
-      var jobject = cli.jobject(textFixture);
+      var jobject = cli.jsonObject();
 
       assert.equal(null, jobject);
     });
@@ -65,5 +65,52 @@ describe('client', function () {
     });
   
   });
+
+  describe('handlers', function () {
+
+    it('should be called for each response', function (done) {
+
+      var cli = client({handlers: [function () {
+        done();
+      }]});
+
+      cli.ticlient = jsonFixture;
+      cli.response();
+    });
+
+    it('should be called before each request', function (done) {
+
+      var cli = client({handlers: [function () {
+        done();
+      }]});
+
+      var noop = function () {};
+      cli.ticlient = {
+        open: noop,
+        send: noop
+      };
+
+      cli.request({url: 'example.com', callback: noop});
+    });
+
+    it('should give access to client options', function (done) {
+
+      var cli = client({bar: 'foo', handlers: [function (req) {
+        assert.equal('bar', req.foo)
+        assert.equal('foo', req.bar)
+        done();
+      }]});
+
+      var noop = function () {};
+      cli.ticlient = {
+        open: noop,
+        send: noop
+      };
+
+      cli.request({url: 'example.com', callback: noop, foo: 'bar'});
+    });
+  
+  });
+
 
 });

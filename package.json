@@ -28,6 +28,7 @@
     "ip": "~0.3.0"
   },
   "dependencies": {
-    "query-string": "~0.2.0"
+    "query-string": "~0.2.0",
+    "extend": "~1.2.1"
   }
 }
