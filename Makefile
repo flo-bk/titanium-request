@@ -6,7 +6,7 @@ clean:
 
 dist:
 	@mkdir -p dist 2>/dev/null
-	@../tetanize/bin/tetanize
+	@node_modules/.bin/tetanize
 	@mv titanium-request.js dist/request.js
 
 test-unit:

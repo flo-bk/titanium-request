@@ -23,7 +23,7 @@
   "devDependencies": {
     "mockti": "~1.1.1",
     "mocha": "~1.17.1",
-    "tetanize": "0.0.6",
+    "tetanize": "0.0.7",
     "express": "~3.4.8",
     "ip": "~0.3.0"
   },
