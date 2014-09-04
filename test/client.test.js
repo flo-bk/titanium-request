@@ -10,7 +10,6 @@ client.prototype._ticlient = function () {
   return Ti.Network.createHTTPClient();
 };
 
-
 describe('client', function () {
 
   describe('jobject()', function () {
@@ -112,5 +111,21 @@ describe('client', function () {
   
   });
 
+  describe('setTimeout()', function () {
+
+    it('should send a timeout error', function (done) {
+      var cli = client();
+      var timeoutCount = 0;
+
+      cli.request({retryEnabled: true, timeout: 0, url: 'http://example.com', callback: function (err, res) {
+        assert.equal(err, 'timeout');
+        if (timeoutCount >= 3) {
+          done();
+        }
+        timeoutCount++;
+      }});
+    });
+
+  });
 
 });
