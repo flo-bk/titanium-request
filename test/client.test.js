@@ -2,6 +2,7 @@ var assert = require('assert');
 var request = require('..');
 var mockti = require('mockti');
 var client = require('../lib/client');
+var errors = require('../lib/errors');
 var jsonFixture = require('./fixtures/responsejson');
 var textFixture = require('./fixtures/responsetext');
 
@@ -118,7 +119,9 @@ describe('client', function () {
       var timeoutCount = 0;
 
       cli.request({retryEnabled: true, timeout: 0, url: 'http://example.com', callback: function (err, res) {
-        assert.equal(err, 'timeout');
+        assert.equal(err instanceof errors.TimeoutError, true);
+        assert.equal(err.tryouts, timeoutCount);
+
         if (timeoutCount >= 3) {
           done();
         }

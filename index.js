@@ -4,6 +4,7 @@
 
 var client = require('./lib/client');
 var settings = require('./lib/settings');
+var errors = require('./lib/errors');
 
 /* Void callback */
 
@@ -78,3 +79,9 @@ request.use = function (handler) {
 request.set = function (name, value) {
   settings[name] = value;
 };
+
+/*
+ * Make the errors lib accessible
+ */
+
+request.errors = errors;

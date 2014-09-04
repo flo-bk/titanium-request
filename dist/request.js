@@ -29,6 +29,7 @@ __tetanize_define('index.js', function (exports, module) {
   
   var client = __tetanize_require('lib/client.js');
   var settings = __tetanize_require('lib/settings.js');
+  var errors = __tetanize_require('lib/errors.js');
   
   /* Void callback */
   
@@ -104,6 +105,12 @@ __tetanize_define('index.js', function (exports, module) {
     settings[name] = value;
   };
   
+  /*
+   * Make the errors lib accessible
+   */
+  
+  request.errors = errors;
+  
 
 });
 __tetanize_define('lib/settings.js', function (exports, module) { 
@@ -112,6 +119,23 @@ __tetanize_define('lib/settings.js', function (exports, module) {
   settings.dbname = 'titanium_request';
   settings.loglevel = 1;
   settings.cookies = false;
+  settings.retryEnabled = false;
+  settings.retryTryouts = 3;
+  settings.timeout = 10000;
+  
+
+});
+__tetanize_define('lib/errors.js', function (exports, module) { 
+  var errors = module.exports = {};
+  
+  errors.TimeoutError = function (tryouts, url) {
+    this.message = 'TimeoutError';
+    this.tryouts = tryouts;
+    this.url = url;
+  };
+  
+  errors.TimeoutError.prototype = Error.prototype;
+  
 
 });
 __tetanize_define('lib/cookie.js', function (exports, module) { 
@@ -262,6 +286,8 @@ __tetanize_define('lib/client.js', function (exports, module) {
   var cookie = __tetanize_require('lib/cookie.js');
   var queryString = __tetanize_require('node_modules/query-string/query-string.js');
   var extend = __tetanize_require('node_modules/extend/index.js');
+  var settings = __tetanize_require('lib/settings.js');
+  var errors = __tetanize_require('lib/errors.js');
   
   
   /*
@@ -274,7 +300,10 @@ __tetanize_define('lib/client.js', function (exports, module) {
     this.ticlient = (this._ticlient || options._ticlient)();
     this.opt = extend({
       handlers: [],
-      headers: {}
+      headers: {},
+      retryEnabled: settings.retryEnabled,
+      timeout: settings.timeout,
+      retryTryouts: settings.retryTryouts
     }, options || {});
   };
   
@@ -308,11 +337,16 @@ __tetanize_define('lib/client.js', function (exports, module) {
   
     if (this.opt.debug) console.log(options.method, options.url);
   
+    this.ticlient.ontimeout = this.timeoutcb(options);
     this.ticlient.onerror = this.errorcb();
     this.ticlient.onload = this.successcb() 
     this.ticlient.open(options.method, options.url, true);
     this.setheaders();
     this.ticlient.send(options.body);
+  
+    if (this.opt.retryEnabled) {
+      this.setTimeout();
+    }
   };
   
   /* Set headers from options.headers object */
@@ -325,6 +359,33 @@ __tetanize_define('lib/client.js', function (exports, module) {
     });
   };
   
+  /* Timeout callback wrapper */
+  
+  client.setTimeout = function () {
+    this.timerId = setTimeout(this.ticlient.ontimeout, this.opt.timeout);
+    this.tryouts = this.tryouts || 0;
+  };
+  
+  client.clearTimeout = function () {
+    clearTimeout(this.timerId);
+    this.tryouts = 0;
+  };
+  
+  client.timeoutcb = function (options) {
+    var that = this;
+    this.retry = function () {
+      if (that.opt.retryTryouts != -1 && that.tryouts >= that.opt.retryTryouts) return;
+      that.tryouts++;
+      that.request(options);
+    };
+  
+    return function () {
+      that.ticlient.abort();
+      that.opt.callback(new errors.TimeoutError(that.tryouts, options.url), null);
+      that.retry();
+    };
+  };
+  
   /* Error callback wrapper */
   
   client.errorcb = function () {
@@ -333,6 +394,7 @@ __tetanize_define('lib/client.js', function (exports, module) {
     return function (error) {
       var res = that.response(that.ticlient);
       that.opt.callback(error, null);
+      that.clearTimeout();
     };
   };
   
@@ -346,6 +408,7 @@ __tetanize_define('lib/client.js', function (exports, module) {
   
       cookie.save(that.opt.url, res.headers);
       that.opt.callback(null, res);
+      that.clearTimeout();
     };
   };
   
@@ -438,6 +501,7 @@ __tetanize_define('lib/client.js', function (exports, module) {
   
     return res;
   };
+  
 
 });
 __tetanize_define('node_modules/query-string/query-string.js', function (exports, module) { 
