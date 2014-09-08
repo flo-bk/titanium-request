@@ -363,12 +363,10 @@ __tetanize_define('lib/client.js', function (exports, module) {
   
   client.setTimeout = function () {
     this.timerId = setTimeout(this.ticlient.ontimeout, this.opt.timeout);
-    this.tryouts = this.tryouts || 0;
   };
   
   client.clearTimeout = function () {
     clearTimeout(this.timerId);
-    this.tryouts = 0;
   };
   
   client.timeoutcb = function (options) {
@@ -376,8 +374,14 @@ __tetanize_define('lib/client.js', function (exports, module) {
     this.retry = function () {
       if (that.opt.retryTryouts != -1 && that.tryouts >= that.opt.retryTryouts) return;
       that.tryouts++;
-      that.request(options);
+      if (that.opt.retry) {
+        that.opt.retry(options);
+      }
+      else {
+        that.request(options);
+      }
     };
+    this.tryouts = this.tryouts || 0;
   
     return function () {
       that.ticlient.abort();
@@ -393,8 +397,10 @@ __tetanize_define('lib/client.js', function (exports, module) {
   
     return function (error) {
       var res = that.response(that.ticlient);
+      error.tryouts = that.tryouts;
       that.opt.callback(error, null);
       that.clearTimeout();
+      that.retry();
     };
   };
   
@@ -409,6 +415,7 @@ __tetanize_define('lib/client.js', function (exports, module) {
       cookie.save(that.opt.url, res.headers);
       that.opt.callback(null, res);
       that.clearTimeout();
+      that.tryouts = 0;
     };
   };
   
