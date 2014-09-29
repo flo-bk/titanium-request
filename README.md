@@ -6,27 +6,27 @@ Get the latest [dist/request.js](https://raw.github.com/IsCoolEntertainment/tita
 
 ## API
 
-__request.get__(url, callback, [data], [options])
+__request.get__(url, callback, [options])
 
 _In GET case, data is converted to query string_
 
-__request.post__(url, callback, [data], [options])
+__request.post__(url, callback, [options])
 
-__request.put__(url, callback, [data], [options])
+__request.put__(url, callback, [options])
 
-__request.delete__(url, callback, [data], [options])
+__request.delete__(url, callback, [options])
 
 ## Example
 
 ```js
 request.get('http://www.example.com', function (err, res) {
-  if (!err && !!res.json) console.log('Got JSON response :', res.json);
+  if (res && res.json) console.log('Got JSON response :', res.json);
 });
 ```
 
-## JSON Response Object
+## Response Object
 
-The JSON object is given as second parameter of a callback, is no error occurred in the request.
+The response object is given as second parameter of a callback, is no error occurred in the request.
 
 * __res.code__ : HTTP Status code
 * __res.text__ : Response as __String__ format
@@ -45,7 +45,7 @@ var headers = {
 };
 
 request.post('http://www.example.com/article', function (err, res) {
-  if (!err && !!res.json) console.log('Got JSON response :', res.json);
+  if (res && res.json) console.log('Got JSON response :', res.json);
 }, {headers: headers});
 ```
 
@@ -53,5 +53,4 @@ request.post('http://www.example.com/article', function (err, res) {
 
 * Cookies cache
 * Requests Pool
-* Retries
 * Response cache
