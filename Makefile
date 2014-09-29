@@ -1,3 +1,5 @@
+sources := $(shell find ./lib -name "*.js")
+
 setup:
 	@npm install
 
@@ -18,5 +20,8 @@ test-integ: dist
 	@./node_modules/.bin/mocha -t 120000 test/integration/suite/*
 
 test: test-unit
+
+validate:
+	@./node_modules/.bin/jshint ${sources}
 
 .PHONY: test dist

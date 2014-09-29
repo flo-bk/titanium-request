@@ -51,6 +51,7 @@ request.post('http://www.example.com/article', function (err, res) {
 
 ## Wish list
 
-* Cookies cache
+* Cookies cache (work in progress)
 * Requests Pool
 * Response cache
+* Mocks

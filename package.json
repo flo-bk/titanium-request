@@ -21,11 +21,12 @@
     "url": "https://github.com/dawicorti/titanium-request/issues"
   },
   "devDependencies": {
-    "mockti": "~1.1.1",
-    "mocha": "~1.17.1",
-    "tetanize": "0.0.7",
     "express": "~3.4.8",
-    "ip": "~0.3.0"
+    "ip": "~0.3.0",
+    "jshint": "^2.5.6",
+    "mocha": "~1.17.1",
+    "mockti": "~1.1.1",
+    "tetanize": "0.0.7"
   },
   "dependencies": {
     "query-string": "~0.2.0",
