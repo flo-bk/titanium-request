@@ -423,7 +423,10 @@ __tetanize_define('lib/client.js', function (exports, module) {
     this.setheaders();
   
     // Make sure send will be called with client scope
-    this.send = this.send.bind(this);
+    this.send = function (error, res) {
+      return client.send.apply(that, [error, res]);
+    };
+  
     inproxy.passThroughProxy(this.opt.url, this);
   };
   
