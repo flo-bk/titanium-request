@@ -1,6 +1,5 @@
 {
   "name": "titanium-request",
-  "version": "0.0.0",
   "description": "Titanium HTTP request library inspired by node and python equivalents",
   "main": "index.js",
   "scripts": {
@@ -29,7 +28,7 @@
     "tetanize": "0.0.7"
   },
   "dependencies": {
-    "query-string": "~0.2.0",
-    "extend": "~1.2.1"
+    "extend": "~1.2.1",
+    "query-string": "~0.2.0"
   }
 }

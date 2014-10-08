@@ -3,6 +3,7 @@
  */
 
 var client = require('./lib/client');
+var inproxy = require('./lib/inproxy');
 var settings = require('./lib/settings');
 var errors = require('./lib/errors');
 
@@ -78,6 +79,15 @@ request.use = function (handler) {
 
 request.set = function (name, value) {
   settings[name] = value;
+};
+
+/*
+ * @api
+ * Register a proxy as a url/path event
+ */
+
+request.on = function (path, handler) {
+  inproxy.registerProxy(path, handler);
 };
 
 /*

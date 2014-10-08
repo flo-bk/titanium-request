@@ -28,6 +28,7 @@ __tetanize_define('index.js', function (exports, module) {
    */
   
   var client = __tetanize_require('lib/client.js');
+  var inproxy = __tetanize_require('lib/inproxy.js');
   var settings = __tetanize_require('lib/settings.js');
   var errors = __tetanize_require('lib/errors.js');
   
@@ -106,6 +107,15 @@ __tetanize_define('index.js', function (exports, module) {
   };
   
   /*
+   * @api
+   * Register a proxy as a url/path event
+   */
+  
+  request.on = function (path, handler) {
+    inproxy.registerProxy(path, handler);
+  };
+  
+  /*
    * Make the errors lib accessible
    */
   
@@ -113,7 +123,67 @@ __tetanize_define('index.js', function (exports, module) {
   
 
 });
+__tetanize_define('lib/inproxy.js', function (exports, module) { 
+  'use strict';
+  
+  
+  /*
+   * Local proxy for mocking / caching or modify requests
+   */
+  
+  var inproxy = module.exports = {};
+  
+  
+  /*
+   * Local referencies
+   */
+  
+  var proxies = [];
+  
+  
+  /* Default handler only forward response from host to user */
+  
+  inproxy.defaultHandler = function (req) {
+      req.call(req.send);
+  };
+  
+  /* Exec registered proxy for a given url */
+  
+  inproxy.passThroughProxy = function (url, req) {
+      var proxy = inproxy.findProxy(url);
+  
+      return proxy(req);
+  };
+  
+  /* Find first matched url proxy */
+  
+  inproxy.findProxy = function (url) {
+      var found = inproxy.defaultHandler;
+  
+      proxies.some(function (proxy) {
+          if (url.match(proxy.reg)) {
+              found = proxy.handler;
+              return true;
+          }
+  
+          return false;
+      });
+  
+      return found;    
+  };
+  
+  /* Register proxy using rule (regex or string) and callback handler */
+  
+  inproxy.registerProxy = function (regOrString, handler) {
+      var reg = typeof regOrString === 'string' ? new RegExp(regOrString) : regOrString;
+  
+      proxies.push({reg: reg, handler: handler});
+  };
+
+});
 __tetanize_define('lib/settings.js', function (exports, module) { 
+  'use strict';
+  
   var settings = module.exports = {};
   
   settings.dbname = 'titanium_request';
@@ -126,6 +196,8 @@ __tetanize_define('lib/settings.js', function (exports, module) {
 
 });
 __tetanize_define('lib/errors.js', function (exports, module) { 
+  'use strict';
+  
   var errors = module.exports = {};
   
   errors.TimeoutError = function (tryouts, url) {
@@ -139,6 +211,8 @@ __tetanize_define('lib/errors.js', function (exports, module) {
 
 });
 __tetanize_define('lib/cookie.js', function (exports, module) { 
+  'use strict';
+  
   /*
    * Dependencies
    */
@@ -180,9 +254,9 @@ __tetanize_define('lib/cookie.js', function (exports, module) {
   cookie.extend = function (url, headers) {
     if (!settings.cookies) return false;
   
-    var paramName = !!headers['Cookie'] ? 'Cookie' : 'cookie';
+    var paramName = !!headers.Cookie ? 'Cookie' : 'cookie';
     var domain = cookie.domain(url);
-    var obj = cookie.getall(domain)
+    var obj = cookie.getall(domain);
   
     if (!!headers[paramName]) {
       var patch = cookie.parse(headers[paramName]);
@@ -209,6 +283,7 @@ __tetanize_define('lib/cookie.js', function (exports, module) {
   /* Select a row in Cookies Table */
   
   cookie.get = function (domain, name) {
+    var result = null;
     var obj = null;
     var query = db.format('SELECT * FROM cookie WHERE domain={domain} AND name={name}', {
       domain: domain,
@@ -240,7 +315,7 @@ __tetanize_define('lib/cookie.js', function (exports, module) {
   /* Parse a 'set-cookie' line */
   
   cookie.parse = function (line) {
-    var obj = {}
+    var obj = {};
     var pairs = line.split(/; */);
   
     pairs.forEach(function(pair) {
@@ -261,10 +336,10 @@ __tetanize_define('lib/cookie.js', function (exports, module) {
   /* Decode and add a cookie pair */
   
   cookie.append = function (pair, obj) {
-    var eqId = pair.indexOf('=')
+    var eqId = pair.indexOf('=');
     if (eqId < 0) return;
   
-    var key = pair.substr(0, eqId).trim()
+    var key = pair.substr(0, eqId).trim();
     var val = pair.substr(++eqId, pair.length).trim();
   
     // quoted values
@@ -280,12 +355,16 @@ __tetanize_define('lib/cookie.js', function (exports, module) {
   cookie.domain = function (url) {
     return url.match(/https?:\/\/([A-Za-z\-0-9]+\.)*([A-Za-z\-0-9]+\.[A-Za-z\-0-9]+)\/?.*/)[2];
   };
+  
 
 });
 __tetanize_define('lib/client.js', function (exports, module) { 
+  'use strict';
+  
   var cookie = __tetanize_require('lib/cookie.js');
   var queryString = __tetanize_require('node_modules/query-string/query-string.js');
   var extend = __tetanize_require('node_modules/extend/index.js');
+  var inproxy = __tetanize_require('lib/inproxy.js');
   var settings = __tetanize_require('lib/settings.js');
   var errors = __tetanize_require('lib/errors.js');
   
@@ -335,18 +414,41 @@ __tetanize_define('lib/client.js', function (exports, module) {
       handler(that.opt, null);
     });
   
-    if (this.opt.debug) console.log(options.method, options.url);
+    if (this.opt.debug) console.log(this.opt.method, this.opt.url);
   
-    this.ticlient.ontimeout = this.timeoutcb(options);
+    this.ticlient.ontimeout = this.timeoutcb(this.opt);
     this.ticlient.onerror = this.errorcb();
-    this.ticlient.onload = this.successcb() 
-    this.ticlient.open(options.method, options.url, true);
+    this.ticlient.onload = this.successcb(); 
+    this.ticlient.open(this.opt.method, this.opt.url, true);
     this.setheaders();
-    this.ticlient.send(options.body);
   
-    if (this.opt.retryEnabled) {
-      this.setTimeout();
-    }
+    // Make sure send will be called with client scope
+    this.send = this.send.bind(this);
+    inproxy.passThroughProxy(this.opt.url, this);
+  };
+  
+  /*
+   * Call preconfigured Ti HTTPClient request,
+   * and forward response to callback parameter
+   */
+  
+  client.call = function (callback) {
+    var callbackBackup = this.opt.callback;
+    var that = this;
+  
+    this.opt.callback = function (error, res) {
+      that.opt.callback = callbackBackup;
+      callback(error, res);
+    };
+  
+    if (this.opt.retryEnabled) this.setTimeout();
+    this.ticlient.send(this.opt.body);
+  };
+  
+  /* Send response parameter to callback */
+  
+  client.send = function (error, res) {
+    this.opt.callback(error, res);
   };
   
   /* Set headers from options.headers object */
@@ -362,7 +464,11 @@ __tetanize_define('lib/client.js', function (exports, module) {
   /* Timeout callback wrapper */
   
   client.setTimeout = function () {
-    this.timerId = setTimeout(this.ticlient.ontimeout, this.opt.timeout);
+    this.timeout = this.opt.timeout;
+  
+    if (typeof this.timeout === 'function') this.timeout = this.timeout(this.tryouts);
+  
+    this.timerId = setTimeout(this.ticlient.ontimeout, this.timeout);
   };
   
   client.clearTimeout = function () {
@@ -385,7 +491,7 @@ __tetanize_define('lib/client.js', function (exports, module) {
   
     return function () {
       that.ticlient.abort();
-      that.opt.callback(new errors.TimeoutError(that.tryouts, options.url), null);
+      that.send(new errors.TimeoutError(that.tryouts, options.url), null);
       that.retry();
     };
   };
@@ -398,7 +504,7 @@ __tetanize_define('lib/client.js', function (exports, module) {
     return function (error) {
       var res = that.response(that.ticlient);
       error.tryouts = that.tryouts;
-      that.opt.callback(error, null);
+      that.send(error, null);
       that.clearTimeout();
       that.retry();
     };
@@ -413,7 +519,7 @@ __tetanize_define('lib/client.js', function (exports, module) {
       var res = that.response(that.ticlient);
   
       cookie.save(that.opt.url, res.headers);
-      that.opt.callback(null, res);
+      that.send(null, res);
       that.clearTimeout();
       that.tryouts = 0;
     };
@@ -662,6 +768,8 @@ __tetanize_define('node_modules/extend/index.js', function (exports, module) {
 
 });
 __tetanize_define('lib/db.js', function (exports, module) { 
+  'use strict';
+  
   /*
    * Dependencies
    */
@@ -680,7 +788,7 @@ __tetanize_define('lib/db.js', function (exports, module) {
   /* Exports Titanium wrapper to DB.open */
   
   db._open = function (dbname) {
-    return Ti.Database.open(dbname)
+    return Ti.Database.open(dbname);
   };
   
   /* Init database and table */
@@ -738,9 +846,12 @@ __tetanize_define('lib/db.js', function (exports, module) {
   
     return res;
   };
+  
 
 });
 __tetanize_define('lib/logger.js', function (exports, module) { 
+  'use strict';
+  
   /*
    * Dependencies
    */
