@@ -112,7 +112,9 @@ API:
 
 **request.on(pattern, inproxy)**
 
+
 **pattern** : string or regex to match specific(s) url(s)
+
 **inproxy** : function handler called with [client](https://github.com/IsCoolEntertainment/titanium-request/blob/master/lib/client.js) as unique argument
 
 *Example : call only once each url, then return cache for all other calls*
