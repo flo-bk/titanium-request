@@ -6,6 +6,10 @@ var client = require('./lib/client');
 var inproxy = require('./lib/inproxy');
 var settings = require('./lib/settings');
 var errors = require('./lib/errors');
+var middlewares = {
+  cookie: require('./lib/middleware/cookie')
+};
+
 
 /* Void callback */
 
@@ -74,11 +78,17 @@ request.use = function (handler) {
 
 /*
  * @api
- * Change one settings variable
+ * Set/Get global config
  */
 
-request.set = function (name, value) {
-  settings[name] = value;
+request.config = {
+  set: function (name, value) {
+    settings[name] = value;
+  },
+
+  get: function (name, def) {
+    return settings[name] || def;
+  }
 };
 
 /*
@@ -89,6 +99,12 @@ request.set = function (name, value) {
 request.on = function (path, handler) {
   inproxy.registerProxy(path, handler);
 };
+
+/*
+ * Export lib native middlewares
+ */
+
+request.middlewares = middlewares;
 
 /*
  * Make the errors lib accessible

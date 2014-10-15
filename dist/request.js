@@ -31,6 +31,10 @@ __tetanize_define('index.js', function (exports, module) {
   var inproxy = __tetanize_require('lib/inproxy.js');
   var settings = __tetanize_require('lib/settings.js');
   var errors = __tetanize_require('lib/errors.js');
+  var middlewares = {
+    cookie: __tetanize_require('lib/middleware/cookie.js')
+  };
+  
   
   /* Void callback */
   
@@ -99,11 +103,17 @@ __tetanize_define('index.js', function (exports, module) {
   
   /*
    * @api
-   * Change one settings variable
+   * Set/Get global config
    */
   
-  request.set = function (name, value) {
-    settings[name] = value;
+  request.config = {
+    set: function (name, value) {
+      settings[name] = value;
+    },
+  
+    get: function (name, def) {
+      return settings[name] || def;
+    }
   };
   
   /*
@@ -114,6 +124,12 @@ __tetanize_define('index.js', function (exports, module) {
   request.on = function (path, handler) {
     inproxy.registerProxy(path, handler);
   };
+  
+  /*
+   * Export lib native middlewares
+   */
+  
+  request.middlewares = middlewares;
   
   /*
    * Make the errors lib accessible
@@ -188,7 +204,6 @@ __tetanize_define('lib/settings.js', function (exports, module) {
   
   settings.dbname = 'titanium_request';
   settings.loglevel = 1;
-  settings.cookies = false;
   settings.retryEnabled = false;
   settings.retryTryouts = 3;
   settings.timeout = 10000;
@@ -210,158 +225,13 @@ __tetanize_define('lib/errors.js', function (exports, module) {
   
 
 });
-__tetanize_define('lib/cookie.js', function (exports, module) { 
-  'use strict';
-  
-  /*
-   * Dependencies
-   */
-  
-  var db = __tetanize_require('lib/db.js');
-  var settings = __tetanize_require('lib/settings.js');
-  
-  /*
-   * Local Referencies
-   */
-  
-  var cookie = module.exports = {};
-  
-  
-  /* Save cookies from 'set-cookie' line */
-  
-  cookie.save = function (url, headers) {
-    if (!settings.cookies) return false;
-  
-    var line = headers['set-cookie'] || headers['Set-Cookie'] || null;
-    if (!line) return false;
-  
-    var domain = cookie.domain(url);
-    var obj = cookie.parse(line);
-    
-    Object.keys(obj).forEach(function (name) {
-      var value = obj[name];
-  
-      if (!cookie.update(domain, name, value)) {
-        cookie.set(domain, name, value);
-      }
-    });
-  
-    return true;
-  };
-  
-  /* Extend the actual cookie line */
-  
-  cookie.extend = function (url, headers) {
-    if (!settings.cookies) return false;
-  
-    var paramName = !!headers.Cookie ? 'Cookie' : 'cookie';
-    var domain = cookie.domain(url);
-    var obj = cookie.getall(domain);
-  
-    if (!!headers[paramName]) {
-      var patch = cookie.parse(headers[paramName]);
-  
-      Object.keys(patch).forEach(function (key) {
-        obj[key] = patch[key];
-      });
-    }
-  
-    headers[paramName] = cookie.serialize(obj);
-    return true;
-  };
-  
-  /* Insert a new row in Cookies Table */
-  
-  cookie.set = function (domain, name, value) {
-    db.q(db.format('INSERT OR REPLACE INTO cookie ({keys}) VALUES ({values})', {
-      domain: domain,
-      name: name,
-      value: value
-    }));
-  };
-  
-  /* Select a row in Cookies Table */
-  
-  cookie.get = function (domain, name) {
-    var result = null;
-    var obj = null;
-    var query = db.format('SELECT * FROM cookie WHERE domain={domain} AND name={name}', {
-      domain: domain,
-      name: name
-    });
-  
-    db.q(query, function (res) {
-      result = res.fieldByName('value');
-    });
-  
-    return result;
-  };
-  
-  /* Select all cookies rows in Cookies Table for a specific domain */
-  
-  cookie.getall = function (domain) {
-    var obj =  {};
-    var query = db.format('SELECT * FROM cookie WHERE domain={domain}', {
-      domain: domain
-    });
-  
-    db.each(query, function (res) {
-      obj[res.fieldByName('name')] = res.fieldByName('value');
-    });
-  
-    return obj;
-  };
-  
-  /* Parse a 'set-cookie' line */
-  
-  cookie.parse = function (line) {
-    var obj = {};
-    var pairs = line.split(/; */);
-  
-    pairs.forEach(function(pair) {
-      cookie.append(pair, obj);
-    });
-  
-    return obj;
-  };
-  
-  /* Serialize a cookie object into a cookie line */
-  
-  cookie.serialize = function (obj) {
-    return Object.keys(obj).map(function (key) {
-      return key + '=' + encodeURIComponent(obj[key]);
-    }).join(';');
-  };
-  
-  /* Decode and add a cookie pair */
-  
-  cookie.append = function (pair, obj) {
-    var eqId = pair.indexOf('=');
-    if (eqId < 0) return;
-  
-    var key = pair.substr(0, eqId).trim();
-    var val = pair.substr(++eqId, pair.length).trim();
-  
-    // quoted values
-    if ('"' == val[0]) {
-        val = val.slice(1, -1);
-    }
-  
-    obj[key] = decodeURIComponent(val);
-  };
-  
-  /* Retrieve domain from url */
-  
-  cookie.domain = function (url) {
-    return url.match(/https?:\/\/([A-Za-z\-0-9]+\.)*([A-Za-z\-0-9]+\.[A-Za-z\-0-9]+)\/?.*/)[2];
-  };
-  
-
-});
 __tetanize_define('lib/client.js', function (exports, module) { 
   'use strict';
   
-  var cookie = __tetanize_require('lib/cookie.js');
+  /*
+   * Dependencies 
+   */
+  
   var queryString = __tetanize_require('node_modules/query-string/query-string.js');
   var extend = __tetanize_require('node_modules/extend/index.js');
   var inproxy = __tetanize_require('lib/inproxy.js');
@@ -409,7 +279,6 @@ __tetanize_define('lib/client.js', function (exports, module) {
     if (query.length > 0) options.url += '?' + query;
     
     this.opt = extend(this.opt, options);
-    cookie.extend(options.url, options.headers);
     this.opt.handlers.forEach(function (handler) {
       handler(that.opt, null);
     });
@@ -521,7 +390,6 @@ __tetanize_define('lib/client.js', function (exports, module) {
     return function () {
       var res = that.response(that.ticlient);
   
-      cookie.save(that.opt.url, res.headers);
       that.send(null, res);
       that.clearTimeout();
       that.tryouts = 0;
@@ -574,7 +442,7 @@ __tetanize_define('lib/client.js', function (exports, module) {
       matchValue = matchLine[2].match(/\s*([^\s]{1}.*[^\s]{1})\s*/);
       if (!matchValue) return;
   
-      obj[matchName[1]] = matchValue[1];
+      obj[matchName[1]] = (obj[matchName[1]] || '') + matchValue[1];
     });
   
     return obj;
@@ -592,10 +460,7 @@ __tetanize_define('lib/client.js', function (exports, module) {
   
     if (!this.ticlient.getAllResponseHeaders) return {};
   
-    raw = this.ticlient.getAllResponseHeaders();
-    if(!raw) return {};
-  
-    return this.splitobj(raw);
+    return this.splitobj(this.ticlient.getAllResponseHeaders());
   };
   
   /* Response object factory */
@@ -611,7 +476,7 @@ __tetanize_define('lib/client.js', function (exports, module) {
       headers: this.headers()
     };
   
-    this.opt.handlers.forEach(function (handler) {
+    that.opt.handlers.forEach(function (handler) {
       handler(that.opt, res);
     });
   
@@ -770,127 +635,231 @@ __tetanize_define('node_modules/extend/index.js', function (exports, module) {
   
 
 });
-__tetanize_define('lib/db.js', function (exports, module) { 
+__tetanize_define('lib/middleware/cookie.js', function (exports, module) { 
   'use strict';
   
   /*
-   * Dependencies
+   * Dependencies 
    */
   
-  var logger = __tetanize_require('lib/logger.js');
-  var settings = __tetanize_require('lib/settings.js');
+  
+  var cookie = __tetanize_require('node_modules/cookie/index.js');
+  var extend = __tetanize_require('node_modules/extend/index.js');
+  var parseUri = __tetanize_require('node_modules/parseUri/parseuri.js');
+  
+  
+  var db = null;
+  var specials = ['_id', '_rev', 'Domain', 'Expires', 'Path', 'Max-Age'];
+  
+  
+  /* Prepare database on CouchDBLite (via ti_touchdb)*/
+  
+  function initDB() {
+      // Isolate this one require because it will fails test
+  
+      var manager = __tetanize_require('com.obscure.titouchdb').databaseManager;
+      db = manager.getDatabase('request_cookie');
+  }
+  
+  /* Save cookies obj into host document */
+  
+  function setCookies(host, cookieSet) {
+      if (db === null) initDB();
+  
+      var doc = db.getDocument(host);
+      var props = doc.properties || {};
+  
+      doc.putProperties(extend({}, props, cookieSet));
+  }
+  
+  /* Iter over host cookies and filter specials (W3C + CouchDB) names */
+  
+  function eachFilteredCookies(host, fn) {
+      if (db === null) initDB();
+  
+      var doc = db.getDocument(host);
+      var props = doc.properties || {};
+  
+      Object.keys(props).forEach(function (name) {
+          if (specials.indexOf(name) < 0) fn(props[name], name);
+      });
+  }
+  
+  /* Extract set-cookie line from http response */
+  
+  function extractCookieSet(res) {
+      var line = null;
+  
+      if (res.headers.hasOwnProperty('Set-Cookie')) line = res.headers['Set-Cookie'];
+      if (res.headers.hasOwnProperty('set-cookie')) line = res.headers['set-cookie'];
+  
+      if (!line) return {};
+  
+      return cookie.parse(line);
+  }
+  
+  /* Save all server requested cookies for current host */
+  
+  function parseResponseHeaders(req, res) {
+      var host = parseUri(req.url).host;
+      var cookieSet = extractCookieSet(res);
+  
+      setCookies(host, cookieSet);
+  }
+  
+  /* Add saved cookies for current host into request headers */
+  
+  function extendRequestHeaders(req, res) {
+      req.headers = req.headers || {};
+      req.headers.cookie = req.headers.cookie || '';
+  
+      var host = parseUri(req.url).host;
+      var requestCookies = cookie.parse(req.headers.cookie);
+  
+      eachFilteredCookies(host, function (value, name) {
+          requestCookies[name] = value;
+      });
+  
+      req.headers.cookie = Object.keys(requestCookies).map(function (name) {
+          return name + '=' + requestCookies[name];
+      }).join('; ');
+  }
   
   /*
-   * Local Referencies
+   * Generate the cookie middleware
    */
   
-  var conn = null;
-  var db = module.exports = {};
-  
-  
-  /* Exports Titanium wrapper to DB.open */
-  
-  db._open = function (dbname) {
-    return Ti.Database.open(dbname);
+  module.exports = function createMiddleware() {
+      return function cookieMiddleware(req, res) {
+          if (!!res) {
+              parseResponseHeaders(req, res);
+          } else {
+              extendRequestHeaders(req, res);
+          }
+      };
   };
+
+});
+__tetanize_define('node_modules/cookie/index.js', function (exports, module) { 
   
-  /* Init database and table */
+  /// Serialize the a name value pair into a cookie string suitable for
+  /// http headers. An optional options object specified cookie parameters
+  ///
+  /// serialize('foo', 'bar', { httpOnly: true })
+  ///   => "foo=bar; httpOnly"
+  ///
+  /// @param {String} name
+  /// @param {String} val
+  /// @param {Object} options
+  /// @return {String}
+  var serialize = function(name, val, opt){
+      opt = opt || {};
+      var enc = opt.encode || encode;
+      var pairs = [name + '=' + enc(val)];
   
-  db.init = function () {
-    var status = true;
-  
-    if (conn !== null)  return true;
-  
-    try {
-      conn = db._open(settings.dbname);
-    } catch (err) {
-      status = false;
-      logger.err('Failed to open database : "' + settings.dbname + '"');
-    }
-  
-    return status;
-  };
-  
-  /* Execute a query */
-  
-  db.q = function (query, callback) {
-    if (! (db.init())) return false;
-    var res = conn.execute(query);
-  
-    if (!!callback && res.isValidRow()) callback(res);
-    res.close();
-    return true;
-  };
-  
-  /* Execute a query for several lines */
-  
-  db.each = function (query, callback) {
-    db.q(query, function (res) {
-      while (res.isValidRow())
-      {
-        callback(res);
-        res.next();
+      if (null != opt.maxAge) {
+          var maxAge = opt.maxAge - 0;
+          if (isNaN(maxAge)) throw new Error('maxAge should be a Number');
+          pairs.push('Max-Age=' + maxAge);
       }
-    });
+  
+      if (opt.domain) pairs.push('Domain=' + opt.domain);
+      if (opt.path) pairs.push('Path=' + opt.path);
+      if (opt.expires) pairs.push('Expires=' + opt.expires.toUTCString());
+      if (opt.httpOnly) pairs.push('HttpOnly');
+      if (opt.secure) pairs.push('Secure');
+  
+      return pairs.join('; ');
   };
   
-  /* Format query with given values */
+  /// Parse the given cookie header string into an object
+  /// The object has the various cookies as keys(names) => values
+  /// @param {String} str
+  /// @return {Object}
+  var parse = function(str, opt) {
+      opt = opt || {};
+      var obj = {}
+      var pairs = str.split(/; */);
+      var dec = opt.decode || decode;
   
-  db.format = function (query, values) {
-    var res = query
-      .replace('{keys}', Object.keys(values).join(','))
-      .replace('{values}', Object.keys(values).map(function (key) {
-        return '\'' + values[key] + '\'';
-      }).join(','));
+      pairs.forEach(function(pair) {
+          var eq_idx = pair.indexOf('=')
   
-    Object.keys(values).forEach(function (key) {
-      res = res.replace('{' + key + '}', '\'' + values[key] + '\'');
-    });
+          // skip things that don't look like key=value
+          if (eq_idx < 0) {
+              return;
+          }
   
-    return res;
+          var key = pair.substr(0, eq_idx).trim()
+          var val = pair.substr(++eq_idx, pair.length).trim();
+  
+          // quoted values
+          if ('"' == val[0]) {
+              val = val.slice(1, -1);
+          }
+  
+          // only assign once
+          if (undefined == obj[key]) {
+              try {
+                  obj[key] = dec(val);
+              } catch (e) {
+                  obj[key] = val;
+              }
+          }
+      });
+  
+      return obj;
   };
+  
+  var encode = encodeURIComponent;
+  var decode = decodeURIComponent;
+  
+  module.exports.serialize = serialize;
+  module.exports.parse = parse;
   
 
 });
-__tetanize_define('lib/logger.js', function (exports, module) { 
-  'use strict';
+__tetanize_define('node_modules/parseUri/parseuri.js', function (exports, module) { 
+  // a node.js module fork of
+  // parseUri 1.2.2
+  // (c) Steven Levithan <stevenlevithan.com>
+  // MIT License
+  // see: http://blog.stevenlevithan.com/archives/parseuri
+  // see: http://stevenlevithan.com/demo/parseuri/js/
   
-  /*
-   * Dependencies
-   */
+  //forked into a node.js module by franz enzenhofer 
+   
   
-  var settings = __tetanize_require('lib/settings.js');
+  function parseUri (str) {
+  	var	o   = parseUri.options,
+  		m   = o.parser[o.strictMode ? "strict" : "loose"].exec(str),
+  		uri = {},
+  		i   = 14;
   
-  /*
-   * Local Referencies
-   */
+  	while (i--) uri[o.key[i]] = m[i] || "";
   
-  var logger = module.exports = {};
-  var levels = ['error', 'warning', 'debug', 'info'];
+  	uri[o.q.name] = {};
+  	uri[o.key[12]].replace(o.q.parser, function ($0, $1, $2) {
+  		if ($1) uri[o.q.name][$1] = $2;
+  	});
   
-  
-  /* Main log function */
-  
-  logger.log = function (lvl, msg) {
-    if (settings.loglevel >= lvl) console.log(msg);
+  	return uri;
   };
   
-  /* Generate accessors */
+  parseUri.options = {
+  	strictMode: false,
+  	key: ["source","protocol","authority","userInfo","user","password","host","port","relative","path","directory","file","query","anchor"],
+  	q:   {
+  		name:   "queryKey",
+  		parser: /(?:^|&)([^&=]*)=?([^&]*)/g
+  	},
+  	parser: {
+  		strict: /^(?:([^:\/?#]+):)?(?:\/\/((?:(([^:@]*)(?::([^:@]*))?)?@)?([^:\/?#]*)(?::(\d*))?))?((((?:[^?#\/]*\/)*)([^?#]*))(?:\?([^#]*))?(?:#(.*))?)/,
+  		loose:  /^(?:(?![^:@]+:[^:@\/]*@)([^:\/?#.]+):)?(?:\/\/)?((?:(([^:@]*)(?::([^:@]*))?)?@)?([^:\/?#]*)(?::(\d*))?)(((\/(?:[^?#](?![^?#\/]*\.[^?#\/.]+(?:[?#]|$)))*\/?)?([^?#\/]*))(?:\?([^#]*))?(?:#(.*))?)/
+  	}
+  };
   
-  levels.forEach(function (lvlname) {
-    logger[lvlname] = function (msg) {
-      var lvl = levels.indexOf(lvlname);
-  
-      logger.log(lvl, msg);
-    };
-  });
-  
-  /* Aliases */
-  
-  logger.err = logger.error;
-  logger.warn = logger.warning;
-  logger.d = logger.debug;
-  
+  module.exports = parseUri
 
 });
 

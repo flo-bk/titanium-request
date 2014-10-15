@@ -28,7 +28,9 @@
     "tetanize": "0.0.7"
   },
   "dependencies": {
+    "cookie": "^0.1.2",
     "extend": "~1.2.1",
+    "parseUri": "^1.2.3-2",
     "query-string": "~0.2.0"
   }
 }
