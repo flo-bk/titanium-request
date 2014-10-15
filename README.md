@@ -1,5 +1,7 @@
 # titanium-request
 
+Titanium HTTP request library inspired by node and python equivalents
+
 ## Installation
 
 Get the latest [dist/request.js](https://raw.github.com/IsCoolEntertainment/titanium-request/master/dist/request.js) into your __Resources__ folder or your __app/lib__ folder, if you're using __Alloy__.
