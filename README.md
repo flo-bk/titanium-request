@@ -4,11 +4,9 @@
 
 Get the latest [dist/request.js](https://raw.github.com/IsCoolEntertainment/titanium-request/master/dist/request.js) into your __Resources__ folder or your __app/lib__ folder, if you're using __Alloy__.
 
-## API
+## Base API
 
 __request.get__(url, callback, [options])
-
-_In GET case, data is converted to query string_
 
 __request.post__(url, callback, [options])
 
