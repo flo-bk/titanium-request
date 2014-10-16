@@ -8,13 +8,13 @@ Get the latest [dist/request.js](https://raw.github.com/IsCoolEntertainment/tita
 
 ## Base API
 
-__request.get__(url, callback, [options])
+__request.get__(_url_, _callback_, [_options_])
 
-__request.post__(url, callback, [options])
+__request.post__(_url_, _callback_, [_options_])
 
-__request.put__(url, callback, [options])
+__request.put__(_url_, _callback_, [_options_])
 
-__request.delete__(url, callback, [options])
+__request.delete__(_url_, _callback_, [_options_])
 
 ## Example
 
@@ -26,18 +26,26 @@ request.get('http://www.example.com', function (err, res) {
 
 ## Response Object
 
-The response object is given as second parameter of a callback, is no error occurred in the request.
+The response object is given as the second parameter of the callback, if no error occurred in the request.
 
-* __res.code__ : HTTP Status code
-* __res.text__ : Response as __String__ format
-* __res.blob__ : Response as [Titanium.Blob](http://docs.appcelerator.com/titanium/latest/#!/api/Titanium.Blob) format
-* __res.xml__  : Response as [Titanium.XML.Document](http://docs.appcelerator.com/titanium/latest/#!/api/Titanium.XML.Document) format (null if text is not XML compliant)
-* __res.json__ : Response as __JSON__ object (null if text is not JSON compliant)
-* __res.headers__ : Response headers as __JSON__ object
+* __res.code__: HTTP Status code
+* __res.text__: Response as a __String__
+* __res.blob__: Response in [Titanium.Blob](http://docs.appcelerator.com/titanium/latest/#!/api/Titanium.Blob) format
+* __res.xml__: Response in [Titanium.XML.Document](http://docs.appcelerator.com/titanium/latest/#!/api/Titanium.XML.Document) format (_null_ if __res.text__ is not well-formed XML)
+* __res.json__: Response as a __JSON__ object (_null_ if __res.text__ is unparseable JSON)
+* __res.headers__: Response headers as a __JSON__ object
 
-## Request Headers
+## Options
 
-The request headers are passed through the options object
+You can pass the following data through the _options_ object argument:
+
+* Request headers
+* Query string
+* Request body
+
+### Request Headers
+
+The request headers are passed through _options.headers_ using an object with the header names as its properties, and the header values as its values.
 
 ```js
 var headers = {
@@ -49,9 +57,9 @@ request.post('http://www.example.com/article', function (err, res) {
 }, {headers: headers});
 ```
 
-## Query string
+### Query string
 
-The query string is passed as an object through the options object
+The query string is passed through _options.query_ using an object with the parameter names as its properties, and the parameter values as its values.
 
 ```js
 request.get('http://www.example.com/article/5', function (err, res) {
@@ -60,13 +68,11 @@ request.get('http://www.example.com/article/5', function (err, res) {
 }, {query : {foo: 'bar', bar: 'baz'}});
 ```
 
-## Request body
+### Request body
 
-The request body is passed through the options object
-It can be a string, an Object or a [Blob](http://docs.appcelerator.com/titanium/latest/#!/api/Titanium.Blob)
+The request body is passed through _options.body_ using either a String, an Object or a [Blob](http://docs.appcelerator.com/titanium/latest/#!/api/Titanium.Blob).
 
 ```js
-
 var payload = {
   author: 'Mark Twain',
   title: 'Tom Sawyer'
@@ -79,43 +85,42 @@ request.post('http://www.example.com/book', function (err, res) {
 
 ## Middlewares
 
-You can register a middleware if you want to execute code
+You can register a middleware if you want to execute some code
 
-* before the request final call
-OR
+* before the request is sent
 * before the response callback
 
 *Example 1 : patch headers for all the requests*
 
 ```js
 request.use(function (req, res) {
-  if (!!res) return; // If res is filled, we are executed after the request call
-  req.headers['x-foo'] = 'bar'; 
+  if (!!res) return; // If res is filled, the request has already been sent
+  req.headers['x-foo'] = 'bar';
 });
 ```
 
-*Example 2 : trigger event when user data is returned in response*
+*Example 2 : trigger event when user data is returned in the response*
 
 ```js
 request.use(function (req, res) {
   if (!!res && !!res.json && !!res.json.user) {
     Ti.App.fireEvent('app:user:updated', {user: res.json.user});
-  } 
+  }
 });
 ```
 
 ## Local proxies
 
-Local proxies can be used to mock part or full data of a request.
+Local proxies can be used to mock part or all the data of a request.
 
 API:
 
-**request.on(pattern, inproxy)**
+**request.on**(_pattern_, _inproxy_)
 
 
-**pattern** : string or regex to match specific(s) url(s)
+_pattern_: String or Regex to match specific(s) url(s)
 
-**inproxy** : function handler called with [client](https://github.com/IsCoolEntertainment/titanium-request/blob/master/lib/client.js) as unique argument
+_inproxy_: function handler called with [client](https://github.com/IsCoolEntertainment/titanium-request/blob/master/lib/client.js) as unique argument
 
 *Example : call only once each url, then return cache for all other calls*
 
@@ -138,7 +143,7 @@ request.on(/^.*$/, function (client) {
 ## Cookies cache
 
 By default cookies are not managed by request.
-You need to activate it by register this middleware :
+You need to activate it by registering this middleware:
 
 ```js
 request.use(request.middlewares.cookie());
