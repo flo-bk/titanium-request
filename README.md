@@ -20,7 +20,7 @@ __request.delete__(_url_, _callback_, [_options_])
 
 ```js
 request.get('http://www.example.com', function (err, res) {
-  if (res && res.json) console.log('Got JSON response :', res.json);
+  if (res && res.json) console.log('Got JSON response:', res.json);
 });
 ```
 
@@ -53,7 +53,7 @@ var headers = {
 };
 
 request.post('http://www.example.com/article', function (err, res) {
-  if (res && res.json) console.log('Got JSON response :', res.json);
+  if (res && res.json) console.log('Got JSON response:', res.json);
 }, {headers: headers});
 ```
 
@@ -63,9 +63,9 @@ The query string is passed through _options.query_ using an object with the para
 
 ```js
 request.get('http://www.example.com/article/5', function (err, res) {
-  // this request will be called with the following URL :
+  // this request will be called with the following URL:
   // http://www.example.com/article/5?foo=bar&bar=baz
-}, {query : {foo: 'bar', bar: 'baz'}});
+}, {query: {foo: 'bar', bar: 'baz'}});
 ```
 
 ### Request body
@@ -90,7 +90,7 @@ You can register a middleware if you want to execute some code
 * before the request is sent
 * before the response callback
 
-*Example 1 : patch headers for all the requests*
+*Example 1: patch headers for all the requests*
 
 ```js
 request.use(function (req, res) {
@@ -99,7 +99,7 @@ request.use(function (req, res) {
 });
 ```
 
-*Example 2 : trigger event when user data is returned in the response*
+*Example 2: trigger event when user data is returned in the response*
 
 ```js
 request.use(function (req, res) {
@@ -122,18 +122,18 @@ _pattern_: String or Regex to match specific(s) url(s)
 
 _inproxy_: function handler called with [client](https://github.com/IsCoolEntertainment/titanium-request/blob/master/lib/client.js) as unique argument
 
-*Example : call only once each url, then return cache for all other calls*
+*Example: call only once each url, then return cache for all other calls*
 
 ```js
 
 var cache = {};
 
 request.on(/^.*$/, function (client) {
-  if (cache.hasOwnProperty(client.url)) {
-    client.send(null, cache[client.url]);
+  if (cache.hasOwnProperty(client.opt.url)) {
+    client.send(null, cache[client.opt.url]);
   } else {
     client.call(function (err, res) {
-      if (!err) cache[client.url] = res;
+      if (!err) cache[client.opt.url] = res;
       client.send(err, res);
     });
   }
@@ -148,4 +148,4 @@ You need to activate it by registering this middleware:
 ```js
 request.use(request.middlewares.cookie());
 ```
- Requirements : [ti_touchdb](https://github.com/pegli/ti_touchdb)
+ Requirements: [ti_touchdb](https://github.com/pegli/ti_touchdb)
