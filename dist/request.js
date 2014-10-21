@@ -229,7 +229,7 @@ __tetanize_define('lib/client.js', function (exports, module) {
   'use strict';
   
   /*
-   * Dependencies 
+   * Dependencies
    */
   
   var queryString = __tetanize_require('node_modules/query-string/query-string.js');
@@ -274,21 +274,24 @@ __tetanize_define('lib/client.js', function (exports, module) {
   
   client.request = function (options) {
     var that = this;
-    var query = queryString.stringify(options.query || {});
-    
-    if (query.length > 0) options.url += '?' + query;
-    
+    var url;
+    var query;
+  
     this.opt = extend(this.opt, options);
     this.opt.handlers.forEach(function (handler) {
       handler(that.opt, null);
     });
   
-    if (this.opt.debug) console.log(this.opt.method, this.opt.url);
+    url = this.opt.url;
+    query = queryString.stringify(this.opt.query || {});
+    if (query.length > 0) url += '?' + query;
+  
+    if (this.opt.debug) console.log(this.opt.method, url);
   
     this.ticlient.ontimeout = this.timeoutcb(this.opt);
     this.ticlient.onerror = this.errorcb();
-    this.ticlient.onload = this.successcb(); 
-    this.ticlient.open(this.opt.method, this.opt.url, true);
+    this.ticlient.onload = this.successcb();
+    this.ticlient.open(this.opt.method, url, true);
     this.setheaders();
   
     // Make sure send will be called with client scope
@@ -296,7 +299,7 @@ __tetanize_define('lib/client.js', function (exports, module) {
       return client.send.apply(that, [error, res]);
     };
   
-    inproxy.passThroughProxy(this.opt.url, this);
+    inproxy.passThroughProxy(url, this);
   };
   
   /*
@@ -404,9 +407,9 @@ __tetanize_define('lib/client.js', function (exports, module) {
     try {
       jsonObject = JSON.parse(this.ticlient.responseText);
     } catch (err) {
-      if (this.opt.debug) console.log(err);  
+      if (this.opt.debug) console.log(err);
     }
-    
+  
     return jsonObject;
   };
   
@@ -420,8 +423,8 @@ __tetanize_define('lib/client.js', function (exports, module) {
     } catch (err) {
       if (this.opt.debug) console.log(err);
     }
-    
-    return xmlObject;  
+  
+    return xmlObject;
   };
   
   
@@ -432,7 +435,7 @@ __tetanize_define('lib/client.js', function (exports, module) {
   
     raw.split('\n').forEach(function (line) {
       var matchLine, matchName, matchValue;
-      
+  
       matchLine = line.match(/([^\:]*)\:(.*)/);
       if (!matchLine) return;
   
