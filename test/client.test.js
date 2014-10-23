@@ -6,12 +6,24 @@ var errors = require('../lib/errors');
 var jsonFixture = require('./fixtures/responsejson');
 var textFixture = require('./fixtures/responsetext');
 
-client.prototype._ticlient = function () {
-  var Ti = mockti();
-  return Ti.Network.createHTTPClient();
-};
 
 describe('client', function () {
+
+  var ticlientBackup = client.prototype._ticlient;
+
+  beforeEach(function () {
+    var noop = function () {};
+
+    client.prototype._ticlient = function () {
+      var Ti = mockti();
+      return Ti.Network.createHTTPClient();
+    };
+  });
+
+  afterEach(function () {
+    client.prototype._ticlient = ticlientBackup;
+  });
+
 
   describe('jobject()', function () {
     
@@ -58,10 +70,10 @@ describe('client', function () {
 
     it('should copy headers values', function () {
       var cli = client();
-      cli.opt = {headers: {'Server': 'gws'}}
+      cli.opt = {headers: {'Server': 'gws'}};
       cli.setheaders();
 
-      assert.equal('gws', cli.ticlient.headers['Server']);
+      assert.equal('gws', cli.opt.headers['Server']);
     });
   
   });
