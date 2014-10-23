@@ -112,40 +112,4 @@ describe('client', function () {
   
   });
 
-  describe('setTimeout()', function () {
-
-    it('should send a timeout error', function (done) {
-      var cli = client();
-      var timeoutCount = 0;
-
-      cli.request({retryEnabled: true, timeout: 0, url: 'http://example.com', callback: function (err, res) {
-        assert.equal(err instanceof errors.TimeoutError, true);
-        assert.equal(err.tryouts, timeoutCount);
-
-        if (timeoutCount >= 3) {
-          done();
-        }
-        timeoutCount++;
-      }});
-    });
-
-    it('should call the timeout handler if a function is given', function (done) {
-      var cli = client();
-      var timeoutCount = 0;
-      var handler = function (tryout) {
-        return 42;
-      };
-
-      cli.request({retryEnabled: true, retryTryouts: 1, timeout: handler, url: 'http://example.com', callback: function (err, res) {
-        if (timeoutCount >= 1) {
-          assert.equal(cli.timeout, 42);
-          done();
-        }
-
-        timeoutCount++;
-      }});
-    });
-
-  });
-
 });
