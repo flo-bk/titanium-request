@@ -28,6 +28,7 @@
     "tetanize": "0.0.7"
   },
   "dependencies": {
+    "bindall-standalone": "^1.0.4",
     "cookie": "^0.1.2",
     "extend": "~1.2.1",
     "parseUri": "^1.2.3-2",

@@ -70,16 +70,20 @@ describe('client', function () {
 
     it('should be called for each response', function (done) {
 
-      var cli = client({handlers: [function () {
-        done();
-      }]});
+      var cli = client({
+        handlers: [
+          function () {
+            done();
+          }
+        ],
+        callback: function noop() {}
+      });
 
       cli.ticlient = jsonFixture;
-      cli.response();
+      cli.successcb()();
     });
 
     it('should be called before each request', function (done) {
-
       var cli = client({handlers: [function () {
         done();
       }]});
@@ -91,6 +95,61 @@ describe('client', function () {
       };
 
       cli.request({url: 'example.com', callback: noop});
+    });
+
+    it('stop chain 2 handlers', function (done) {
+      var callCount = 0;
+      var cli = client({
+        handlers: [
+          function firstHandler() {
+            callCount++;
+          },
+          function secondHandler() {
+            callCount++;
+          }
+        ],
+        callback: function noop() {},
+        url: 'example.com'
+      });
+
+      var noop = function () {};
+      cli.ticlient = {
+        open: noop,
+        send: noop
+      };
+
+      cli.request({url: 'example.com', callback: noop});
+
+      assert.equal(2, callCount);
+      done();
+    });
+
+    it('stop chaining to next handler if previous returned false', function (done) {
+      var callCount = 0;
+      var cli = client({
+        handlers: [
+          function firstHandler() {
+            callCount++;
+            return false;
+          },
+          function secondHandler() {
+            callCount++;
+          }
+        ],
+        callback: function noop() {},
+        url: 'example.com'
+      });
+
+      var noop = function () {};
+      cli.ticlient = {
+        open: noop,
+        send: noop
+      };
+
+      cli.request({url: 'example.com', callback: noop});
+
+      assert.equal(1, callCount);
+      done();
     });
 
     it('should give access to client options', function (done) {
