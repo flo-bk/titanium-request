@@ -171,4 +171,21 @@ describe('client', function () {
   
   });
 
+  describe('timeout handler', function () {
+    it('should send a timeout error', function (done) {
+      var cli = client();
+      var noop = function () {};
+
+      cli.ticlient = {
+        open: noop,
+        send: noop
+      };
+
+      cli.request({url: 'example.com', timeout: 1, callback: function (err, res) {
+        done();
+      }});
+    });
+
+  });
+
 });
