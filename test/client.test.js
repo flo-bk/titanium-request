@@ -80,7 +80,7 @@ describe('client', function () {
       });
 
       cli.ticlient = jsonFixture;
-      cli.successcb()();
+      cli.handleResponse();
     });
 
     it('should be called before each request', function (done) {
