@@ -38,14 +38,17 @@ describe('retryMiddleware', function () {
       };
 
       var cli = client({
-        handlers: [retryMiddleware({multiplier: 2, maxTryouts: 4})]
+        handlers: [retryMiddleware({multiplier: 2, maxTryouts: 4})],
+        url: 'example.com',
+        timeout: 1,
+        callback: function (err, res) {
+          assert.deepEqual([1, 2, 4, 8], timeouts);
+          client.prototype.setTimeout = setTimeoutBackup;
+          done();
+        }
       });
 
-      cli.request({url: 'example.com', timeout: 1, callback: function (err, res) {
-        assert.deepEqual([1, 2, 4, 8], timeouts);
-        client.prototype.setTimeout = setTimeoutBackup;
-        done();
-      }});
+      cli.call();
     });
 
     it('should call request 2 times and keep tryout value', function (done) {
@@ -58,14 +61,17 @@ describe('retryMiddleware', function () {
       };
 
       var cli = client({
-        handlers: [retryMiddleware({multiplier: 1, maxTryouts: 2})]
+        handlers: [retryMiddleware({multiplier: 1, maxTryouts: 2})],
+        url: 'example.com',
+        timeout: 1,
+        callback: function (err, res) {
+          assert.deepEqual([1, 1], timeouts);
+          client.prototype.setTimeout = setTimeoutBackup;
+          done();
+        }
       });
 
-      cli.request({url: 'example.com', timeout: 1, callback: function (err, res) {
-        assert.deepEqual([1, 1], timeouts);
-        client.prototype.setTimeout = setTimeoutBackup;
-        done();
-      }});
+      cli.call();
     });
 
   });

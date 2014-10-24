@@ -102,21 +102,27 @@ describe('client', function () {
     });
 
     it('should be called before each request', function (done) {
-      var cli = client({handlers: [function () {
-        done();
-      }]});
-
       var noop = function () {};
+      var cli = client({
+        handlers: [function () {
+          done();
+        }],
+        url: 'example.com',
+        callback: noop
+      });
+
       cli.ticlient = {
         open: noop,
-        send: noop
+        send: noop,
+        setTimeout: noop
       };
 
-      cli.request({url: 'example.com', callback: noop});
+      cli.call();
     });
 
-    it('stop chain 2 handlers', function (done) {
+    it('should chain 2 handlers', function (done) {
       var callCount = 0;
+      var noop = function () {};
       var cli = client({
         handlers: [
           function firstHandler() {
@@ -130,13 +136,12 @@ describe('client', function () {
         url: 'example.com'
       });
 
-      var noop = function () {};
       cli.ticlient = {
         open: noop,
         send: noop
       };
 
-      cli.request({url: 'example.com', callback: noop});
+      cli.call();
 
       assert.equal(2, callCount);
       done();
@@ -144,6 +149,7 @@ describe('client', function () {
 
     it('stop chaining to next handler if previous returned false', function (done) {
       var callCount = 0;
+      var noop = function () {};
       var cli = client({
         handlers: [
           function firstHandler() {
@@ -158,56 +164,71 @@ describe('client', function () {
         url: 'example.com'
       });
 
-      var noop = function () {};
       cli.ticlient = {
         open: noop,
         send: noop
       };
 
-      cli.request({url: 'example.com', callback: noop});
+      cli.call();
 
       assert.equal(1, callCount);
       done();
     });
 
     it('should give access to client options', function (done) {
-
-      var cli = client({bar: 'foo', handlers: [function (req) {
-        assert.equal('bar', req.foo)
-        assert.equal('foo', req.bar)
-        done();
-      }]});
-
       var noop = function () {};
+      var cli = client({
+        bar: 'foo',
+        handlers: [function (req) {
+          assert.equal('bar', req.foo)
+          assert.equal('foo', req.bar)
+          done();
+        }],
+        url: 'example.com',
+        callback: noop,
+        foo: 'bar'
+      });
+
       cli.ticlient = {
         open: noop,
         send: noop
       };
 
-      cli.request({url: 'example.com', callback: noop, foo: 'bar'});
+      cli.call();
     });
   
   });
 
   describe('timeout handler', function () {
     it('should send a timeout error', function (done) {
-      var cli = client();
       var noop = function () {};
+      var cli = client({
+        url: 'example.com',
+        timeout: 1,
+        callback: function (err, res) {
+          assert.equal(true, err instanceof errors.TimeoutError);
+          done();
+        }
+      });
 
       cli.ticlient = {
         open: noop,
         send: noop
       };
 
-      cli.request({url: 'example.com', timeout: 1, callback: function (err, res) {
-        assert.equal(true, err instanceof errors.TimeoutError);
-        done();
-      }});
+      cli.call();
     });
 
     it('should send a NoNetworkError if no network found', function (done) {
-      var cli = client();
       var noop = function () {};
+      var cli = client({
+        url: 'example.com',
+        timeout: 1,
+        callback: function (err, res) {
+          assert.equal(true, err instanceof errors.NoNetworkError);
+          done();
+        }
+      });
 
       cli.ticlient = {
         open: noop,
@@ -218,10 +239,7 @@ describe('client', function () {
         return false;
       };
 
-      cli.request({url: 'example.com', timeout: 1, callback: function (err, res) {
-        assert.equal(true, err instanceof errors.NoNetworkError);
-        done();
-      }});
+      cli.call();
     });
 
   });
