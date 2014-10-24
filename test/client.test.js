@@ -9,19 +9,25 @@ var textFixture = require('./fixtures/responsetext');
 
 describe('client', function () {
 
-  var ticlientBackup = client.prototype._ticlient;
+  var ticlientBackup = client.prototype.getHTTPClient;
+  var isOnlineBackup = client.prototype.isOnline;
 
   beforeEach(function () {
     var noop = function () {};
 
-    client.prototype._ticlient = function () {
+    client.prototype.getHTTPClient = function () {
       var Ti = mockti();
       return Ti.Network.createHTTPClient();
+    };
+
+    client.prototype.isOnline = function () {
+      return true;
     };
   });
 
   afterEach(function () {
-    client.prototype._ticlient = ticlientBackup;
+    client.prototype.getHTTPClient = ticlientBackup;
+    client.prototype.isOnline = isOnlineBackup;
   });
 
 
@@ -66,12 +72,12 @@ describe('client', function () {
 
   });
 
-  describe('setheaders()', function () {
+  describe('setHeaders()', function () {
 
     it('should copy headers values', function () {
       var cli = client();
       cli.opt = {headers: {'Server': 'gws'}};
-      cli.setheaders();
+      cli.setHeaders();
 
       assert.equal('gws', cli.opt.headers['Server']);
     });
@@ -194,6 +200,26 @@ describe('client', function () {
       };
 
       cli.request({url: 'example.com', timeout: 1, callback: function (err, res) {
+        assert.equal(true, err instanceof errors.TimeoutError);
+        done();
+      }});
+    });
+
+    it('should send a NoNetworkError if no network found', function (done) {
+      var cli = client();
+      var noop = function () {};
+
+      cli.ticlient = {
+        open: noop,
+        send: noop
+      };
+
+      cli.isOnline = function () {
+        return false;
+      };
+
+      cli.request({url: 'example.com', timeout: 1, callback: function (err, res) {
+        assert.equal(true, err instanceof errors.NoNetworkError);
         done();
       }});
     });

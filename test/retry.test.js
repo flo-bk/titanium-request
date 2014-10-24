@@ -4,21 +4,27 @@ var client = require('../lib/client');
 var retryMiddleware = require('../lib/middleware/retry');
 
 describe('retryMiddleware', function () {
-  var ticlientBackup = client.prototype._ticlient;
+  var ticlientBackup = client.prototype.getHTTPClient;
+  var isOnlineBackup = client.prototype.isOnline;
 
   beforeEach(function () {
     var noop = function () {};
 
-    client.prototype._ticlient = function () {
+    client.prototype.getHTTPClient = function () {
       return {
         open: noop,
         send: noop
       }
     };
+
+    client.prototype.isOnline = function () {
+      return true;
+    };
   });
 
   afterEach(function () {
-    client.prototype._ticlient = ticlientBackup;
+    client.prototype.getHTTPClient = ticlientBackup;
+    client.prototype.isOnline = isOnlineBackup;
   });
 
   describe('timeout handler', function () {

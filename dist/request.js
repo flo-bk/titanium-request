@@ -32,7 +32,8 @@ __tetanize_define('index.js', function (exports, module) {
   var settings = __tetanize_require('lib/settings.js');
   var errors = __tetanize_require('lib/errors.js');
   var middlewares = {
-    cookie: __tetanize_require('lib/middleware/cookie.js')
+    cookie: __tetanize_require('lib/middleware/cookie.js'),
+    retry: __tetanize_require('lib/middleware/retry.js')
   };
   
   
@@ -244,7 +245,7 @@ __tetanize_define('lib/client.js', function (exports, module) {
     if (!(this instanceof Client)) return new Client(options);
   
     bindAll(this);
-    this.ticlient = (this._ticlient || options._ticlient)();
+    this.ticlient = this._ticlient();
     this.opt = extend({
       handlers: [],
       headers: {}
@@ -282,15 +283,21 @@ __tetanize_define('lib/client.js', function (exports, module) {
   
       // Make sure ticlient won't get the timeout before us
       that.ticlient.timeout = that.opt.timeout * 100;
-      that.ticlient.onerror = that.handleResponse;
+      that.ticlient.onerror = that.handlePartialResponse();
       that.ticlient.onload = that.handlePartialResponse(null);
-      that.timeoutid = setTimeout(function () {
+      /*that.timeoutid = this.setTimeout(function () {
         that.handleResponse(new errors.TimeoutError());
-      }, that.opt.timeout);
+      }, that.opt.timeout);*/
       that.ticlient.open(that.opt.method, url, true);
       that.setheaders();
       inproxy.passThroughProxy(url, that);
     });
+  };
+  
+  /* setTimeout wrapper (help tests) */
+  
+  client.setTimeout = function (handler, timeout) {
+    return setTimeout(handler, timeout);
   };
   
   /* Chain handlers and callback, if every handlers returned anything but false */
@@ -340,7 +347,7 @@ __tetanize_define('lib/client.js', function (exports, module) {
   
   client.handleResponse = function (err) {
     var that = this;
-    var res = that.response(that.ticlient);
+    var res = this.response();
   
     clearTimeout(that.timeoutid);
     if (this.responseHandled) return false;
@@ -349,13 +356,14 @@ __tetanize_define('lib/client.js', function (exports, module) {
     this.runHandlers(this.opt, res, err, this.send);
   };
   
-  /* Call handleResponse and force error argument */
+  /* Call handleResponse, force error argument and keep scope */
   
-  client.handlePartialResponse = function (forced) {
+  client.handlePartialResponse = function () {
     var that = this;
+    var args = Array.prototype.slice.call(arguments);
   
     return function (err) {
-      that.handleResponse(forced);
+      that.handleResponse(args.length > 0 ? args[0] : err);
     };
   };
   
@@ -730,6 +738,59 @@ __tetanize_define('lib/middleware/cookie.js', function (exports, module) {
               parseResponseHeaders(req, res);
           } else {
               extendRequestHeaders(req, res);
+          }
+      };
+  };
+
+});
+__tetanize_define('lib/middleware/retry.js', function (exports, module) { 
+  'use strict';
+  
+  /*
+   * Dependencies 
+   */
+  
+  
+  var client = __tetanize_require('lib/client.js');
+  var extend = __tetanize_require('node_modules/extend/index.js');
+  var TimeoutError = __tetanize_require('lib/errors.js').TimeoutError;
+  
+  /*
+   * Defaults middleware settings
+   */
+  
+  var retryDefaults = {
+      multiplier: 1,
+      maxTryouts: 3
+  };
+  
+  /* If TimeoutError is received,
+   * increase previous timeout and call a new request */
+  
+  function parseResponse(config, req, res, err) {
+      if (! (err instanceof TimeoutError)) return;
+  
+  
+      throw 'timeout';
+      req.tryout = req.tryout || 1;
+      if (req.tryout >= config.maxTryouts) return;
+  
+      req.tryout++;
+      req.timeout = req.timeout * config.multiplier;
+      client(req).request();
+      return false;
+  };
+  
+  /*
+   * Generate the retry middleware
+   */
+  
+  module.exports = function createMiddleware(opts) {
+      var config = extend({}, retryDefaults, opts || {});
+  
+      return function retryMiddleware(req, res, err) {
+          if (!!res) {
+              return parseResponse(config, req, res, err);
           }
       };
   };

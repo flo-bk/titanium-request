@@ -7,7 +7,8 @@ var inproxy = require('./lib/inproxy');
 var settings = require('./lib/settings');
 var errors = require('./lib/errors');
 var middlewares = {
-  cookie: require('./lib/middleware/cookie')
+  cookie: require('./lib/middleware/cookie'),
+  retry: require('./lib/middleware/retry')
 };
 
 
