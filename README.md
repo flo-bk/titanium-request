@@ -109,37 +109,6 @@ request.use(function (req, res) {
 });
 ```
 
-## Local proxies
-
-Local proxies can be used to mock part or all the data of a request.
-
-API:
-
-**request.on**(_pattern_, _inproxy_)
-
-
-_pattern_: String or Regex to match specific(s) url(s)
-
-_inproxy_: function handler called with [client](https://github.com/IsCoolEntertainment/titanium-request/blob/master/lib/client.js) as unique argument
-
-*Example: call only once each url, then return cache for all other calls*
-
-```js
-
-var cache = {};
-
-request.on(/^.*$/, function (client) {
-  if (cache.hasOwnProperty(client.opt.url)) {
-    client.send(null, cache[client.opt.url]);
-  } else {
-    client.call(function (err, res) {
-      if (!err) cache[client.opt.url] = res;
-      client.send(err, res);
-    });
-  }
-});
-```
-
 ## Cookies cache
 
 By default cookies are not managed by request.
