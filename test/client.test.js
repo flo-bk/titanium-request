@@ -6,12 +6,30 @@ var errors = require('../lib/errors');
 var jsonFixture = require('./fixtures/responsejson');
 var textFixture = require('./fixtures/responsetext');
 
-client.prototype._ticlient = function () {
-  var Ti = mockti();
-  return Ti.Network.createHTTPClient();
-};
 
 describe('client', function () {
+
+  var ticlientBackup = client.prototype.getHTTPClient;
+  var isOnlineBackup = client.prototype.isOnline;
+
+  beforeEach(function () {
+    var noop = function () {};
+
+    client.prototype.getHTTPClient = function () {
+      var Ti = mockti();
+      return Ti.Network.createHTTPClient();
+    };
+
+    client.prototype.isOnline = function () {
+      return true;
+    };
+  });
+
+  afterEach(function () {
+    client.prototype.getHTTPClient = ticlientBackup;
+    client.prototype.isOnline = isOnlineBackup;
+  });
+
 
   describe('jobject()', function () {
     
@@ -54,14 +72,14 @@ describe('client', function () {
 
   });
 
-  describe('setheaders()', function () {
+  describe('setHeaders()', function () {
 
     it('should copy headers values', function () {
       var cli = client();
-      cli.opt = {headers: {'Server': 'gws'}}
-      cli.setheaders();
+      cli.opt = {headers: {'Server': 'gws'}};
+      cli.setHeaders();
 
-      assert.equal('gws', cli.ticlient.headers['Server']);
+      assert.equal('gws', cli.opt.headers['Server']);
     });
   
   });
@@ -70,80 +88,158 @@ describe('client', function () {
 
     it('should be called for each response', function (done) {
 
-      var cli = client({handlers: [function () {
-        done();
-      }]});
+      var cli = client({
+        handlers: [
+          function () {
+            done();
+          }
+        ],
+        callback: function noop() {}
+      });
 
       cli.ticlient = jsonFixture;
-      cli.response();
+      cli.handleResponse();
     });
 
     it('should be called before each request', function (done) {
-
-      var cli = client({handlers: [function () {
-        done();
-      }]});
-
       var noop = function () {};
+      var cli = client({
+        handlers: [function () {
+          done();
+        }],
+        url: 'example.com',
+        callback: noop
+      });
+
+      cli.ticlient = {
+        open: noop,
+        send: noop,
+        setTimeout: noop
+      };
+
+      cli.call();
+    });
+
+    it('should chain 2 handlers', function (done) {
+      var callCount = 0;
+      var noop = function () {};
+      var cli = client({
+        handlers: [
+          function firstHandler() {
+            callCount++;
+          },
+          function secondHandler() {
+            callCount++;
+          }
+        ],
+        callback: function noop() {},
+        url: 'example.com'
+      });
+
       cli.ticlient = {
         open: noop,
         send: noop
       };
 
-      cli.request({url: 'example.com', callback: noop});
+      cli.call();
+
+      assert.equal(2, callCount);
+      done();
+    });
+
+    it('stop chaining to next handler if previous returned false', function (done) {
+      var callCount = 0;
+      var noop = function () {};
+      var cli = client({
+        handlers: [
+          function firstHandler() {
+            callCount++;
+            return false;
+          },
+          function secondHandler() {
+            callCount++;
+          }
+        ],
+        callback: function noop() {},
+        url: 'example.com'
+      });
+
+      cli.ticlient = {
+        open: noop,
+        send: noop
+      };
+
+      cli.call();
+
+      assert.equal(1, callCount);
+      done();
     });
 
     it('should give access to client options', function (done) {
-
-      var cli = client({bar: 'foo', handlers: [function (req) {
-        assert.equal('bar', req.foo)
-        assert.equal('foo', req.bar)
-        done();
-      }]});
-
       var noop = function () {};
+      var cli = client({
+        bar: 'foo',
+        handlers: [function (req) {
+          assert.equal('bar', req.foo)
+          assert.equal('foo', req.bar)
+          done();
+        }],
+        url: 'example.com',
+        callback: noop,
+        foo: 'bar'
+      });
+
       cli.ticlient = {
         open: noop,
         send: noop
       };
 
-      cli.request({url: 'example.com', callback: noop, foo: 'bar'});
+      cli.call();
     });
   
   });
 
-  describe('setTimeout()', function () {
-
+  describe('timeout handler', function () {
     it('should send a timeout error', function (done) {
-      var cli = client();
-      var timeoutCount = 0;
-
-      cli.request({retryEnabled: true, timeout: 0, url: 'http://example.com', callback: function (err, res) {
-        assert.equal(err instanceof errors.TimeoutError, true);
-        assert.equal(err.tryouts, timeoutCount);
-
-        if (timeoutCount >= 3) {
+      var noop = function () {};
+      var cli = client({
+        url: 'example.com',
+        timeout: 1,
+        callback: function (err, res) {
+          assert.equal(true, err instanceof errors.TimeoutError);
           done();
         }
-        timeoutCount++;
-      }});
-    });
+      });
 
-    it('should call the timeout handler if a function is given', function (done) {
-      var cli = client();
-      var timeoutCount = 0;
-      var handler = function (tryout) {
-        return 42;
+      cli.ticlient = {
+        open: noop,
+        send: noop
       };
 
-      cli.request({retryEnabled: true, retryTryouts: 1, timeout: handler, url: 'http://example.com', callback: function (err, res) {
-        if (timeoutCount >= 1) {
-          assert.equal(cli.timeout, 42);
+      cli.call();
+    });
+
+    it('should send a NoNetworkError if no network found', function (done) {
+      var noop = function () {};
+      var cli = client({
+        url: 'example.com',
+        timeout: 1,
+        callback: function (err, res) {
+          assert.equal(true, err instanceof errors.NoNetworkError);
           done();
         }
+      });
 
-        timeoutCount++;
-      }});
+      cli.ticlient = {
+        open: noop,
+        send: noop
+      };
+
+      cli.isOnline = function () {
+        return false;
+      };
+
+      cli.call();
     });
 
   });

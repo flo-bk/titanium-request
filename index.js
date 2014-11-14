@@ -7,7 +7,8 @@ var inproxy = require('./lib/inproxy');
 var settings = require('./lib/settings');
 var errors = require('./lib/errors');
 var middlewares = {
-  cookie: require('./lib/middleware/cookie')
+  cookie: require('./lib/middleware/cookie'),
+  retry: require('./lib/middleware/retry')
 };
 
 
@@ -25,7 +26,7 @@ request.setup = function (url, callback, options, method) {
   options.method = method;
   options.handlers = handlers;
 
-  return options;
+  return client(options);
 };
 
 /*
@@ -34,7 +35,7 @@ request.setup = function (url, callback, options, method) {
  */
 
 request.get = function (url, callback, options) {
-  client().request(request.setup(url, callback, options, 'GET'));
+  request.setup(url, callback, options, 'GET').call();
 };
 
 
@@ -44,7 +45,7 @@ request.get = function (url, callback, options) {
  */
 
 request.post = function (url, callback, options) {
-  client().request(request.setup(url, callback, options, 'POST'));
+  request.setup(url, callback, options, 'POST').call();
 };
 
 
@@ -54,7 +55,7 @@ request.post = function (url, callback, options) {
  */
 
 request.put = function (url, callback, options) {
-  client().request(request.setup(url, callback, options, 'PUT'));
+  request.setup(url, callback, options, 'PUT').call();
 };
 
 
@@ -64,7 +65,7 @@ request.put = function (url, callback, options) {
  */
 
 request.delete = function (url, callback, options) {
-  client().request(request.setup(url, callback, options, 'DELETE'));
+  request.setup(url, callback, options, 'DELETE').call();
 };
 
 /*

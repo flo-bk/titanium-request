@@ -12,7 +12,7 @@ dist:
 	@mv titanium-request.js dist/request.js
 
 test-unit:
-	@./node_modules/.bin/mocha
+	@./node_modules/.bin/mocha -R nyan
 
 test-integ: dist
 	@cp dist/request.js ./test/integration/app/Resources/request.js

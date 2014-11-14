@@ -32,7 +32,8 @@ __tetanize_define('index.js', function (exports, module) {
   var settings = __tetanize_require('lib/settings.js');
   var errors = __tetanize_require('lib/errors.js');
   var middlewares = {
-    cookie: __tetanize_require('lib/middleware/cookie.js')
+    cookie: __tetanize_require('lib/middleware/cookie.js'),
+    retry: __tetanize_require('lib/middleware/retry.js')
   };
   
   
@@ -50,7 +51,7 @@ __tetanize_define('index.js', function (exports, module) {
     options.method = method;
     options.handlers = handlers;
   
-    return options;
+    return client(options);
   };
   
   /*
@@ -59,7 +60,7 @@ __tetanize_define('index.js', function (exports, module) {
    */
   
   request.get = function (url, callback, options) {
-    client().request(request.setup(url, callback, options, 'GET'));
+    request.setup(url, callback, options, 'GET').call();
   };
   
   
@@ -69,7 +70,7 @@ __tetanize_define('index.js', function (exports, module) {
    */
   
   request.post = function (url, callback, options) {
-    client().request(request.setup(url, callback, options, 'POST'));
+    request.setup(url, callback, options, 'POST').call();
   };
   
   
@@ -79,7 +80,7 @@ __tetanize_define('index.js', function (exports, module) {
    */
   
   request.put = function (url, callback, options) {
-    client().request(request.setup(url, callback, options, 'PUT'));
+    request.setup(url, callback, options, 'PUT').call();
   };
   
   
@@ -89,7 +90,7 @@ __tetanize_define('index.js', function (exports, module) {
    */
   
   request.delete = function (url, callback, options) {
-    client().request(request.setup(url, callback, options, 'DELETE'));
+    request.setup(url, callback, options, 'DELETE').call();
   };
   
   /*
@@ -159,16 +160,16 @@ __tetanize_define('lib/inproxy.js', function (exports, module) {
   
   /* Default handler only forward response from host to user */
   
-  inproxy.defaultHandler = function (req) {
-      req.call(req.send);
+  inproxy.defaultHandler = function (client) {
+      client.call(client.send);
   };
   
   /* Exec registered proxy for a given url */
   
-  inproxy.passThroughProxy = function (url, req) {
+  inproxy.passThroughProxy = function (url, client) {
       var proxy = inproxy.findProxy(url);
   
-      return proxy(req);
+      return proxy(client);
   };
   
   /* Find first matched url proxy */
@@ -202,12 +203,8 @@ __tetanize_define('lib/settings.js', function (exports, module) {
   
   var settings = module.exports = {};
   
-  settings.dbname = 'titanium_request';
   settings.loglevel = 1;
-  settings.retryEnabled = false;
-  settings.retryTryouts = 3;
   settings.timeout = 10000;
-  
 
 });
 __tetanize_define('lib/errors.js', function (exports, module) { 
@@ -215,14 +212,47 @@ __tetanize_define('lib/errors.js', function (exports, module) {
   
   var errors = module.exports = {};
   
-  errors.TimeoutError = function (tryouts, url) {
-    this.message = 'TimeoutError';
-    this.tryouts = tryouts;
-    this.url = url;
+  var RequestError = function(name, infos) {
+      this.name = name;
+      this.infos = infos || {};
+  }
+  
+  RequestError.prototype = new Error();
+  
+  RequestError.prototype.toString = function () {
+      var infos = this.infos;
+      var infosLine = Object.keys(infos).map(function (name) {
+          return name + '=' + infos[name];
+      }).join(';');
+  
+  
+      return this.name + (infosLine.length > 0 ? ' : ' + infosLine : '');
   };
   
-  errors.TimeoutError.prototype = Error.prototype;
+  RequestError.extend = function () {
+      var args = Array.prototype.slice.call(arguments);
+      var ErrorChild = function () {
+          var childArgs = Array.prototype.slice.call(arguments);
+          var name = args[0];
+          var index = 1;
+          var infos = {};
   
+          for (index = 1; index < args.length; index++) {
+              if (index - 1 < childArgs.length) {
+                  infos[args[index]] = childArgs[index - 1];
+              }
+          }
+  
+          RequestError.apply(this, [name, infos]);
+      }
+  
+      ErrorChild.prototype = new RequestError();
+      return ErrorChild;
+  };
+  
+  
+  errors.TimeoutError = RequestError.extend('TimeoutError', 'timeout');
+  errors.NoNetworkError = RequestError.extend('NoNetworkError');
 
 });
 __tetanize_define('lib/client.js', function (exports, module) { 
@@ -232,6 +262,7 @@ __tetanize_define('lib/client.js', function (exports, module) {
    * Dependencies
    */
   
+  var bindAll = __tetanize_require('node_modules/bindall-standalone/index.js');
   var queryString = __tetanize_require('node_modules/query-string/query-string.js');
   var extend = __tetanize_require('node_modules/extend/index.js');
   var inproxy = __tetanize_require('lib/inproxy.js');
@@ -246,22 +277,13 @@ __tetanize_define('lib/client.js', function (exports, module) {
   var Client = module.exports = function (options) {
     if (!(this instanceof Client)) return new Client(options);
   
-    this.ticlient = (this._ticlient || options._ticlient)();
+    bindAll(this);
+    this.ticlient = this.getHTTPClient();
     this.opt = extend({
       handlers: [],
-      headers: {},
-      retryEnabled: settings.retryEnabled,
-      timeout: settings.timeout,
-      retryTryouts: settings.retryTryouts
-    }, options || {});
+      headers: {}
+    }, settings, options || {});
   };
-  
-  /* Simple Titanium HTTPClient constructor */
-  
-  Client.prototype._ticlient = function () {
-    return Ti.Network.createHTTPClient();
-  };
-  
   
   /*
    * Local Referencies
@@ -270,36 +292,56 @@ __tetanize_define('lib/client.js', function (exports, module) {
   var client = Client.prototype;
   
   
-  /* HTTP request factory */
+  /* setTimeout wrapper (help tests) */
   
-  client.request = function (options) {
-    var that = this;
-    var url;
-    var query;
+  client.setTimeout = function (handler, timeout) {
+    return setTimeout(handler, timeout);
+  };
   
-    this.opt = extend(this.opt, options);
-    this.opt.handlers.forEach(function (handler) {
-      handler(that.opt, null);
+  /* Network.online wrapper (help tests) */
+  
+  client.isOnline = function () {
+    return Ti.Network.online;
+  }
+  
+  /* Titanium HTTPClient constructor (help tests) */
+  
+  client.getHTTPClient = function () {
+    return Ti.Network.createHTTPClient();
+  };
+  
+  /* Chain handlers and callback, if every handlers returned anything but false */
+  
+  client.runHandlers = function (req, res, err, callback) {
+    var status = this.opt.handlers.every(function (handler) {
+      return handler(req, res, err) !== false;
     });
   
-    url = this.opt.url;
-    query = queryString.stringify(this.opt.query || {});
-    if (query.length > 0) url += '?' + query;
+    if (status === true) callback.apply(this, [err, res]);
+  };
   
-    if (this.opt.debug) console.log(this.opt.method, url);
+  client.prepareCall = function (hook, callback) {
+    var that = this;
   
-    this.ticlient.ontimeout = this.timeoutcb(this.opt);
-    this.ticlient.onerror = this.errorcb();
-    this.ticlient.onload = this.successcb();
-    this.ticlient.open(this.opt.method, url, true);
-    this.setheaders();
+    this.opt.hook = hook;
+    this.runHandlers(this.opt, null, null, function () {
+      var url = that.opt.url;
+      var query = queryString.stringify(that.opt.query || {});
   
-    // Make sure send will be called with client scope
-    this.send = function (error, res) {
-      return client.send.apply(that, [error, res]);
-    };
+      if (query.length > 0) url += '?' + query;
+      if (that.opt.debug) console.log(that.opt.method, url);
   
-    inproxy.passThroughProxy(url, this);
+      // Make sure ticlient won't get the timeout before us
+      that.ticlient.timeout = that.opt.timeout * 100;
+      that.ticlient.onerror = that.handlePartialResponse();
+      that.ticlient.onload = that.handlePartialResponse(null);
+      that.timeoutid = this.setTimeout(function () {
+        that.handleResponse(new errors.TimeoutError(that.opt.timeout));
+      }, that.opt.timeout);
+      that.ticlient.open(that.opt.method, url, true);
+      that.setHeaders();
+      callback.apply(that, [url]);
+    });
   };
   
   /*
@@ -307,28 +349,26 @@ __tetanize_define('lib/client.js', function (exports, module) {
    * and forward response to callback parameter
    */
   
-  client.call = function (callback) {
-    var callbackBackup = this.opt.callback;
+  client.call = function (hook) {
     var that = this;
   
-    this.opt.callback = function (error, res) {
-      that.opt.callback = callbackBackup;
-      callback(error, res);
-    };
-  
-    if (this.opt.retryEnabled) this.setTimeout();
-    this.ticlient.send(this.opt.body);
+    this.prepareCall(hook, function (url) {
+      that.ticlient.send(that.opt.body);
+    });
   };
   
   /* Send response parameter to callback */
   
-  client.send = function (error, res) {
-    this.opt.callback(error, res);
+  client.send = function (err, res) {
+    var callback = this.opt.hook || this.opt.callback;
+  
+    this.opt.hook = null;
+    callback(!!err ? err : null, !!err ? null : res);
   };
   
   /* Set headers from options.headers object */
   
-  client.setheaders = function () {
+  client.setHeaders = function () {
     var that = this;
   
     Object.keys(this.opt.headers || {}).forEach(function (name) {
@@ -336,66 +376,28 @@ __tetanize_define('lib/client.js', function (exports, module) {
     });
   };
   
-  /* Timeout callback wrapper */
+  /* Return a response handler that can be called only once */
   
-  client.setTimeout = function () {
-    this.timeout = this.opt.timeout;
-  
-    if (typeof this.timeout === 'function') this.timeout = this.timeout(this.tryouts);
-  
-    this.timerId = setTimeout(this.ticlient.ontimeout, this.timeout);
-  };
-  
-  client.clearTimeout = function () {
-    clearTimeout(this.timerId);
-  };
-  
-  client.timeoutcb = function (options) {
+  client.handleResponse = function (err) {
     var that = this;
-    this.retry = function () {
-      if (that.opt.retryTryouts != -1 && that.tryouts >= that.opt.retryTryouts) return;
-      that.tryouts++;
-      if (that.opt.retry) {
-        that.opt.retry(options);
-      }
-      else {
-        that.request(options);
-      }
-    };
-    this.tryouts = this.tryouts || 0;
+    var res = this.response();
   
-    return function () {
-      that.ticlient.abort();
-      that.send(new errors.TimeoutError(that.tryouts, options.url), null);
-      that.retry();
-    };
+    clearTimeout(that.timeoutid);
+    if (this.responseHandled) return false;
+    if (! this.isOnline()) err = new errors.NoNetworkError();
+  
+    this.responseHandled = true;
+    this.runHandlers(this.opt, res, err, this.send);
   };
   
-  /* Error callback wrapper */
+  /* Call handleResponse, force error argument and keep scope */
   
-  client.errorcb = function () {
+  client.handlePartialResponse = function () {
     var that = this;
+    var args = Array.prototype.slice.call(arguments);
   
-    return function (error) {
-      var res = that.response(that.ticlient);
-      error.tryouts = that.tryouts;
-      that.send(error, null);
-      that.clearTimeout();
-      that.retry();
-    };
-  };
-  
-  /* Success callback wrapper */
-  
-  client.successcb = function () {
-    var that = this;
-  
-    return function () {
-      var res = that.response(that.ticlient);
-  
-      that.send(null, res);
-      that.clearTimeout();
-      that.tryouts = 0;
+    return function (err) {
+      that.handleResponse(args.length > 0 ? args[0] : err);
     };
   };
   
@@ -430,7 +432,7 @@ __tetanize_define('lib/client.js', function (exports, module) {
   
   /* Split a raw paragraph to build a corresponding object */
   
-  client.splitobj = function (raw) {
+  client.splitObj = function (raw) {
     var obj = {};
   
     raw.split('\n').forEach(function (line) {
@@ -463,14 +465,13 @@ __tetanize_define('lib/client.js', function (exports, module) {
   
     if (!this.ticlient.getAllResponseHeaders) return {};
   
-    return this.splitobj(this.ticlient.getAllResponseHeaders());
+    return this.splitObj(this.ticlient.getAllResponseHeaders());
   };
   
   /* Response object factory */
   
   client.response = function () {
-    var that = this;
-    var res = {
+    return {
       code: this.ticlient.status,
       xml: this.xmlObject(),
       blob: this.ticlient.responseData,
@@ -478,14 +479,47 @@ __tetanize_define('lib/client.js', function (exports, module) {
       json: this.jsonObject(),
       headers: this.headers()
     };
-  
-    that.opt.handlers.forEach(function (handler) {
-      handler(that.opt, res);
-    });
-  
-    return res;
   };
   
+
+});
+__tetanize_define('node_modules/bindall-standalone/index.js', function (exports, module) { 
+  'use strict';
+  
+  module.exports = function(object) {
+      if(!object) return console.warn('bindAll requires at least one argument.');
+  
+      var functions = Array.prototype.slice.call(arguments, 1);
+  
+      if (functions.length === 0) {
+          var toString = Object.prototype.toString;
+          var hasOwnProperty = Object.prototype.hasOwnProperty;
+  
+          for (var method in object) {
+              if(hasOwnProperty.call(object, method)) {
+                  if(typeof object[method] == 'function' && toString.call(object[method]) == "[object Function]") {
+                      functions.push(method);
+                  }
+              }
+          }
+      }
+  
+      for(var i = 0; i < functions.length; i++) {
+          var f = functions[i];
+          object[f] = bind(object[f], object);
+      }
+  };
+  
+  /*
+      Faster bind without specific-case checking. (see https://coderwall.com/p/oi3j3w).
+      bindAll is only needed for events binding so no need to make slow fixes for constructor
+      or partial application.
+  */
+  function bind(func, context) {
+    return function() {
+      return func.apply(context, arguments);
+    };
+  }
 
 });
 __tetanize_define('node_modules/query-string/query-string.js', function (exports, module) { 
@@ -738,6 +772,58 @@ __tetanize_define('lib/middleware/cookie.js', function (exports, module) {
               parseResponseHeaders(req, res);
           } else {
               extendRequestHeaders(req, res);
+          }
+      };
+  };
+
+});
+__tetanize_define('lib/middleware/retry.js', function (exports, module) { 
+  'use strict';
+  
+  /*
+   * Dependencies 
+   */
+  
+  
+  var client = __tetanize_require('lib/client.js');
+  var extend = __tetanize_require('node_modules/extend/index.js');
+  var TimeoutError = __tetanize_require('lib/errors.js').TimeoutError;
+  
+  /*
+   * Defaults middleware settings
+   */
+  
+  var retryDefaults = {
+      multiplier: 1,
+      maxTryouts: 3
+  };
+  
+  /* If TimeoutError is received,
+   * increase previous timeout and call a new request
+   */
+  
+  function parseResponse(config, req, res, err) {
+      if (! (err instanceof TimeoutError)) return;
+  
+      req.tryout = req.tryout || 1;
+      if (req.tryout >= config.maxTryouts) return;
+  
+      req.tryout++;
+      req.timeout = req.timeout * config.multiplier;
+      client(req).call();
+      return false;
+  };
+  
+  /*
+   * Generate the retry middleware
+   */
+  
+  module.exports = function createMiddleware(opts) {
+      var config = extend({}, retryDefaults, opts || {});
+  
+      return function retryMiddleware(req, res, err) {
+          if (!!res) {
+              return parseResponse(config, req, res, err);
           }
       };
   };
