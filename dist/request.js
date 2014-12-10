@@ -99,7 +99,8 @@ __tetanize_define('index.js', function (exports, module) {
    */
   
   request.use = function (handler) {
-    handlers.push(handler);
+    if (handlers.indexOf(handler) === -1)
+      handlers.push(handler);
   };
   
   /*
@@ -486,14 +487,15 @@ __tetanize_define('lib/client.js', function (exports, module) {
 __tetanize_define('node_modules/bindall-standalone/index.js', function (exports, module) { 
   'use strict';
   
+  var toString = Object.prototype.toString,
+      hasOwnProperty = Object.prototype.hasOwnProperty;
+  
   module.exports = function(object) {
       if(!object) return console.warn('bindAll requires at least one argument.');
   
       var functions = Array.prototype.slice.call(arguments, 1);
   
       if (functions.length === 0) {
-          var toString = Object.prototype.toString;
-          var hasOwnProperty = Object.prototype.hasOwnProperty;
   
           for (var method in object) {
               if(hasOwnProperty.call(object, method)) {
