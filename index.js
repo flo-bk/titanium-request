@@ -74,7 +74,8 @@ request.delete = function (url, callback, options) {
  */
 
 request.use = function (handler) {
-  handlers.push(handler);
+  if (handlers.indexOf(handler) === -1)
+    handlers.push(handler);
 };
 
 /*
