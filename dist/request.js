@@ -49,7 +49,6 @@ __tetanize_define('index.js', function (exports, module) {
     options.url = url;
     options.callback = callback || noop;
     options.method = method;
-    options.handlers = handlers;
   
     return client(options);
   };

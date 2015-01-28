@@ -24,7 +24,6 @@ request.setup = function (url, callback, options, method) {
   options.url = url;
   options.callback = callback || noop;
   options.method = method;
-  options.handlers = handlers;
 
   return client(options);
 };
