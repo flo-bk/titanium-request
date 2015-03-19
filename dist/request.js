@@ -363,6 +363,9 @@ __tetanize_define('lib/client.js', function (exports, module) {
     var callback = this.opt.hook || this.opt.callback;
   
     this.opt.hook = null;
+    if(res && res.json && res.json.error) {
+      err.source.message = res.json.error;
+    }
     callback(!!err ? err : null, !!err ? null : res);
   };
   
